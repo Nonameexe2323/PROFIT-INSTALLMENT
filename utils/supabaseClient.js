@@ -74,7 +74,7 @@ export async function saveUserToSupabase(user) {
             }], { onConflict: 'id' })
         
         if (error) {
-            console.error('Supabase user save error:', error)
+            console.error('Supabase user save error:', error.message)
         }
         return { success: !error }
     } catch (e) {
@@ -90,8 +90,17 @@ export async function getAllUsersFromSupabase() {
             .select('*')
             .order('created_at', { ascending: false })
             
-        if (error || !data || data.length === 0) {
+        if (error || !data) {
+            console.warn('Supabase fetch users warning/error:', error?.message)
             return getUsersFromStorage()
+        }
+
+        if (data.length === 0) {
+            const localUsers = getUsersFromStorage()
+            for (const u of localUsers) {
+                await saveUserToSupabase(u)
+            }
+            return localUsers
         }
 
         const formatted = data.map(u => ({
@@ -107,7 +116,9 @@ export async function getAllUsersFromSupabase() {
         const hasSakchawit = formatted.some(u => u.name?.toLowerCase() === 'sakchawit')
         if (!hasSakchawit) {
             const currentPass = getOwnerPassword()
-            formatted.unshift({ ...DEFAULT_DEMO_USER, password: currentPass })
+            const ownerObj = { ...DEFAULT_DEMO_USER, password: currentPass }
+            formatted.unshift(ownerObj)
+            saveUserToSupabase(ownerObj)
         }
 
         saveUsersToStorage(formatted)
@@ -124,7 +135,6 @@ export async function adminToggleUserRoleInSupabase(userId, newIsAdmin) {
             .update({ is_admin: newIsAdmin })
             .eq('id', userId)
 
-        // Update local cache
         const users = getUsersFromStorage()
         const updated = users.map(u => u.id === userId ? { ...u, isAdmin: newIsAdmin } : u)
         saveUsersToStorage(updated)
@@ -143,7 +153,6 @@ export async function adminDeleteUserInSupabase(userId) {
             .delete()
             .eq('id', userId)
 
-        // Update local cache
         const users = getUsersFromStorage()
         const updated = users.filter(u => u.id !== userId)
         saveUsersToStorage(updated)
@@ -314,7 +323,7 @@ export async function registerNewUser(name, email, password, inviteCode) {
     return { success: true, user: newUser }
 }
 
-// Owner Admin Function: Directly Create User Account (ด้วยสิทธิ์ Admin / สมาชิก)
+// Owner Admin Function: Directly Create User Account
 export async function adminCreateUserAccount(name, email, password, isAdmin = false) {
     const users = await getAllUsersFromSupabase()
     const trimmedName = name.trim()
