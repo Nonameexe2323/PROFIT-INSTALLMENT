@@ -71,10 +71,14 @@ export async function saveUserToSupabase(user) {
                 email: user.email,
                 password: user.password,
                 is_admin: user.isAdmin || false
-            }])
+            }], { onConflict: 'id' })
+        
+        if (error) {
+            console.error('Supabase user save error:', error)
+        }
         return { success: !error }
     } catch (e) {
-        console.warn('Sync user to Supabase error:', e)
+        console.warn('Sync user to Supabase exception:', e)
         return { success: false }
     }
 }
@@ -208,7 +212,7 @@ export function logoutUserSession() {
     }
 }
 
-export function registerNewUser(name, email, password, inviteCode) {
+export async function registerNewUser(name, email, password, inviteCode) {
     const users = getUsersFromStorage()
     const trimmedName = name.trim()
     const trimmedEmail = email.trim().toLowerCase()
@@ -246,7 +250,9 @@ export function registerNewUser(name, email, password, inviteCode) {
     const filteredUsers = users.filter(u => u.name?.toLowerCase() !== trimmedName.toLowerCase())
     filteredUsers.push(newUser)
     saveUsersToStorage(filteredUsers)
-    saveUserToSupabase(newUser)
+    
+    // Await Supabase insertion
+    await saveUserToSupabase(newUser)
 
     // Set current active user session
     setCurrentUserSession(newUser, true)
@@ -255,7 +261,7 @@ export function registerNewUser(name, email, password, inviteCode) {
 }
 
 // Owner Admin Function: Directly Create User Account
-export function adminCreateUserAccount(name, email, password) {
+export async function adminCreateUserAccount(name, email, password) {
     const users = getUsersFromStorage()
     const trimmedName = name.trim()
     const trimmedEmail = email.trim().toLowerCase()
@@ -278,7 +284,7 @@ export function adminCreateUserAccount(name, email, password) {
 
     users.push(newUser)
     saveUsersToStorage(users)
-    saveUserToSupabase(newUser)
+    await saveUserToSupabase(newUser)
 
     return { success: true, user: newUser }
 }

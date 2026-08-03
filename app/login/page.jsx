@@ -67,8 +67,8 @@ export default function LoginPage() {
         }, 150)
     }
 
-    // Register Handler (พร้อมระบบแจ้งเตือน Custom สวยงาม ไม่ใช้ Browser Default)
-    const handleRegisterSubmit = (e) => {
+    // Register Handler (พร้อมระบบแจ้งเตือน Custom สวยงาม และ Await ซิงก์ไป Supabase 100%)
+    const handleRegisterSubmit = async (e) => {
         e.preventDefault()
         if (!regInviteCode.trim()) {
             setErrorMsg('⚠️ กรุณากรอกรหัสอนุมัติสมัครสมาชิกจากเจ้าของเว็บ (sakchawit)')
@@ -91,19 +91,17 @@ export default function LoginPage() {
         setErrorMsg('')
         setSuccessMsg('')
 
-        setTimeout(() => {
-            const res = registerNewUser(regName, regEmail, regPassword, regInviteCode)
-            setIsLoading(false)
-            if (res.success) {
-                if (typeof window !== 'undefined') {
-                    sessionStorage.setItem('just_logged_in', 'true')
-                }
-                setSuccessMsg(`🎉 สมัครสมาชิกสำเร็จ! สร้างบัญชีใหม่สำหรับคุณ ${res.user.name} เรียบร้อย`)
-                setTimeout(() => router.push('/'), 400)
-            } else {
-                setErrorMsg(`⚠️ ${res.error || 'คุณต้องมีรหัสสมัครจากเจ้าของเว็บ (sakchawit)'}`)
+        const res = await registerNewUser(regName, regEmail, regPassword, regInviteCode)
+        setIsLoading(false)
+        if (res.success) {
+            if (typeof window !== 'undefined') {
+                sessionStorage.setItem('just_logged_in', 'true')
             }
-        }, 150)
+            setSuccessMsg(`🎉 สมัครสมาชิกสำเร็จ! สร้างบัญชีใหม่สำหรับคุณ ${res.user.name} เรียบร้อย`)
+            setTimeout(() => router.push('/'), 500)
+        } else {
+            setErrorMsg(`⚠️ ${res.error || 'คุณต้องมีรหัสสมัครจากเจ้าของเว็บ (sakchawit)'}`)
+        }
     }
 
     const isLight = theme === 'light'
