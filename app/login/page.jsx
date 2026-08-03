@@ -41,8 +41,8 @@ export default function LoginPage() {
         localStorage.setItem('app_theme', nextTheme)
     }
 
-    // Login Handler
-    const handleLoginSubmit = (e) => {
+    // Login Handler (ดึงข้อมูลผู้ใช้ตรงจาก Supabase 100%)
+    const handleLoginSubmit = async (e) => {
         e.preventDefault()
         if (!loginIdentifier.trim() || !loginPassword) {
             setErrorMsg('⚠️ กรุณากรอกชื่อผู้ใช้/อีเมล และรหัสผ่านให้ครบถ้วน')
@@ -52,19 +52,17 @@ export default function LoginPage() {
         setErrorMsg('')
         setSuccessMsg('')
         
-        setTimeout(() => {
-            const res = loginUserAccount(loginIdentifier, loginPassword)
-            setIsLoading(false)
-            if (res.success) {
-                if (typeof window !== 'undefined') {
-                    sessionStorage.setItem('just_logged_in', 'true')
-                }
-                setSuccessMsg(`🎉 เข้าสู่ระบบสำเร็จ ยินดีต้อนรับคุณ ${res.user.name}`)
-                setTimeout(() => router.push('/'), 300)
-            } else {
-                setErrorMsg('⚠️ ชื่อผู้ใช้/อีเมล หรือรหัสผ่านไม่ถูกต้อง (ลองตรวจสอบตัวพิมพ์เล็ก/ใหญ่)')
+        const res = await loginUserAccount(loginIdentifier, loginPassword)
+        setIsLoading(false)
+        if (res.success) {
+            if (typeof window !== 'undefined') {
+                sessionStorage.setItem('just_logged_in', 'true')
             }
-        }, 150)
+            setSuccessMsg(`🎉 เข้าสู่ระบบสำเร็จ ยินดีต้อนรับคุณ ${res.user.name}`)
+            setTimeout(() => router.push('/'), 300)
+        } else {
+            setErrorMsg('⚠️ ชื่อผู้ใช้/อีเมล หรือรหัสผ่านไม่ถูกต้อง (ลองตรวจสอบตัวพิมพ์เล็ก/ใหญ่)')
+        }
     }
 
     // Register Handler
@@ -317,7 +315,7 @@ export default function LoginPage() {
                                 </div>
                             )}
 
-                            {/* MODE 1: LOGIN FORM (Mobile Optimized Auto-Capitalize Disabled) */}
+                            {/* MODE 1: LOGIN FORM */}
                             {mode === 'login' ? (
                                 <form onSubmit={handleLoginSubmit} noValidate className="space-y-4">
                                     <div>

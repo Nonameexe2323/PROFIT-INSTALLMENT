@@ -11,7 +11,7 @@ import {
     Database, Copy, Terminal, ShieldCheck, Flame, PieChart as PieIcon, ArrowRight,
     Phone, Share2, Calendar, Tag, Wallet, Receipt, AlertTriangle, CheckCircle, Info,
     Sun, Moon, Calculator, Image as ImageIcon, Upload, Eye, PartyPopper, Rocket,
-    Crown, Key, Users, Settings, Lock
+    Crown, Key, Users, Settings, Lock, UserCheck, Shield
 } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell, PieChart, Pie } from 'recharts'
 import { 
@@ -31,7 +31,10 @@ import {
     getInviteCodeFromStorage,
     saveInviteCodeToStorage,
     getUsersFromStorage,
+    getAllUsersFromSupabase,
     adminCreateUserAccount,
+    adminToggleUserRoleInSupabase,
+    adminDeleteUserInSupabase,
     getOwnerPassword,
     saveOwnerPassword
 } from '@/utils/supabaseClient'
@@ -75,6 +78,7 @@ export default function ProfitTrackerDashboard() {
     const [adminNewName, setAdminNewName] = useState('')
     const [adminNewEmail, setAdminNewEmail] = useState('')
     const [adminNewPassword, setAdminNewPassword] = useState('')
+    const [adminNewIsAdmin, setAdminNewIsAdmin] = useState(false)
     const [allUsersList, setAllUsersList] = useState([])
 
     // Supabase DB connection state
@@ -158,10 +162,12 @@ export default function ProfitTrackerDashboard() {
         setCurrentUser(user)
         setIsAuthChecking(false)
 
-        // Init Owner Invite Code & User List & Owner Password
+        // Init Owner Invite Code & Owner Password
         setOwnerInviteCodeInput(getInviteCodeFromStorage())
-        setAllUsersList(getUsersFromStorage())
         setCurrentOwnerPassDisplay(getOwnerPassword())
+
+        // Fetch Live Users from Supabase
+        fetchUsersList()
 
         // Trigger Welcome Pop-up Modal every time user fresh logs in or registers
         const justLoggedIn = sessionStorage.getItem('just_logged_in')
@@ -172,6 +178,11 @@ export default function ProfitTrackerDashboard() {
 
         loadUserData(user.id)
     }, [])
+
+    const fetchUsersList = async () => {
+        const list = await getAllUsersFromSupabase()
+        setAllUsersList(list)
+    }
 
     const toggleTheme = () => {
         const nextTheme = theme === 'dark' ? 'light' : 'dark'
@@ -229,21 +240,51 @@ export default function ProfitTrackerDashboard() {
     }
 
     // Owner Admin Handlers
-    const handleAdminCreateAccount = (e) => {
+    const handleAdminCreateAccount = async (e) => {
         e.preventDefault()
         if (!adminNewName || !adminNewEmail || !adminNewPassword) {
             triggerToast('⚠️ กรุณากรอกข้อมูลให้ครบถ้วนทุกช่อง')
             return
         }
-        const res = adminCreateUserAccount(adminNewName, adminNewEmail, adminNewPassword)
+        const res = await adminCreateUserAccount(adminNewName, adminNewEmail, adminNewPassword, adminNewIsAdmin)
         if (res.success) {
-            triggerToast(`🎉 สร้างบัญชีผู้ใช้ใหม่สำหรับคุณ ${res.user.name} สำเร็จ!`)
+            triggerToast(`🎉 สร้างบัญชี ${adminNewIsAdmin ? '👑 แอดมิน' : '👤 สมาชิก'} สำหรับคุณ ${res.user.name} บน Supabase เรียบร้อย!`)
             setAdminNewName('')
             setAdminNewEmail('')
             setAdminNewPassword('')
-            setAllUsersList(getUsersFromStorage())
+            setAdminNewIsAdmin(false)
+            fetchUsersList()
         } else {
             triggerToast(`⚠️ ${res.error}`)
+        }
+    }
+
+    const handleToggleUserRole = async (userId, targetUserName, currentRole) => {
+        const nextRole = !currentRole
+        triggerToast(`⏳ กำลังปรับยศให้คุณ ${targetUserName}...`)
+        const res = await adminToggleUserRoleInSupabase(userId, nextRole)
+        if (res.success) {
+            triggerToast(`👑 ปรับยศให้คุณ ${targetUserName} เป็น ${nextRole ? 'แอดมิน' : 'สมาชิกธรรมดา'} บน Supabase สำเร็จ!`)
+            fetchUsersList()
+        } else {
+            triggerToast('⚠️ ไม่สามารถปรับยศได้ กรุณาลองใหม่อีกครั้ง')
+        }
+    }
+
+    const handleDeleteUserAccount = async (userId, targetUserName) => {
+        if (targetUserName.toLowerCase() === 'sakchawit') {
+            triggerToast('⚠️ ไม่สามารถลบบัญชีเจ้าของระบบ sakchawit ได้!')
+            return
+        }
+        if (confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบบัญชีคุณ ${targetUserName} ถาวรออกจาก Supabase?`)) {
+            triggerToast(`⏳ กำลังลบบัญชีคุณ ${targetUserName}...`)
+            const res = await adminDeleteUserInSupabase(userId)
+            if (res.success) {
+                triggerToast(`🗑️ ลบบัญชีคุณ ${targetUserName} ออกจาก Supabase ถาวรเรียบร้อย!`)
+                fetchUsersList()
+            } else {
+                triggerToast('⚠️ เกิดข้อผิดพลาดในการลบบัญชี')
+            }
         }
     }
 
@@ -259,9 +300,9 @@ export default function ProfitTrackerDashboard() {
         if (!ownerNewPasswordInput) return
         saveOwnerPassword(ownerNewPasswordInput)
         setCurrentOwnerPassDisplay(ownerNewPasswordInput)
-        setAllUsersList(getUsersFromStorage())
         triggerToast(`🔒 บันทึกรหัสผ่านใหม่เจ้าของระบบ "${ownerNewPasswordInput}" สำเร็จ!`)
         setOwnerNewPasswordInput('')
+        fetchUsersList()
     }
 
     // Is Owner Check (sakchawit or admin)
@@ -497,7 +538,7 @@ export default function ProfitTrackerDashboard() {
             isLight ? 'bg-slate-100 text-slate-900 selection:bg-indigo-600 selection:text-white' : 'bg-[#08080c] text-gray-100 selection:bg-indigo-500 selection:text-white'
         }`}>
             
-            {/* Falling Money Particles Effect (Optimized for 60FPS GPU Acceleration) */}
+            {/* Falling Money Particles Effect */}
             <MoneyParticles active={showMoneyParticles} count={16} />
 
             {/* Ambient Background Aura Blobs */}
@@ -545,11 +586,14 @@ export default function ProfitTrackerDashboard() {
 
                     {/* Right Header Actions */}
                     <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
-                        {/* Owner Admin Panel Button (เจ้าของระบบ sakchawit) */}
+                        {/* Owner Admin Panel Button */}
                         {isOwnerAdmin && (
                             <button
                                 type="button"
-                                onClick={() => setShowOwnerModal(true)}
+                                onClick={() => {
+                                    fetchUsersList()
+                                    setShowOwnerModal(true)
+                                }}
                                 className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold text-xs shadow-md flex items-center gap-1.5 hover:scale-105 transition-transform cursor-pointer"
                                 title="เมนูจัดการสมาชิกสำหรับเจ้าของระบบ"
                             >
@@ -616,7 +660,7 @@ export default function ProfitTrackerDashboard() {
                             💼 ระบบบันทึกกำไร & ยอดผ่อนชำระ
                         </h1>
                         <p className={`text-xs sm:text-sm mt-0.5 ${isLight ? 'text-slate-600' : 'text-gray-400'}`}>
-                            บัญชีของคุณ <span className="text-indigo-500 font-bold">{currentUser?.name}</span> {isOwnerAdmin && <span className="text-amber-400 font-bold ml-1">(เจ้าของระบบ 👑)</span>} • แยกข้อมูลเฉพาะบัญชีนี้ 100%
+                            บัญชีของคุณ <span className="text-indigo-500 font-bold">{currentUser?.name}</span> {isOwnerAdmin && <span className="text-amber-400 font-bold ml-1">(เจ้าของระบบ 👑)</span>} • ซิงก์ฐานข้อมูล Supabase 100%
                         </p>
                     </div>
 
@@ -1088,7 +1132,7 @@ export default function ProfitTrackerDashboard() {
                 </div>
             </main>
 
-            {/* WELCOME POP-UP MODAL (GPU Smooth 60FPS) */}
+            {/* WELCOME POP-UP MODAL */}
             {showWelcomeModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 animate-fade-in-up gpu-accelerate">
                     <div className={`border w-full max-w-md rounded-3xl shadow-2xl p-6 sm:p-8 relative overflow-hidden text-center gpu-accelerate ${
@@ -1137,7 +1181,7 @@ export default function ProfitTrackerDashboard() {
                             </div>
                             <div className="flex items-center gap-2 text-purple-400 font-bold">
                                 <CheckCircle2 className="w-4 h-4 shrink-0 text-purple-500" />
-                                <span>พื้นที่ส่วนตัว ข้อมูลซิงก์อิสระ 100%</span>
+                                <span>ซิงก์ตรงกับฐานข้อมูล Supabase อัตโนมัติ</span>
                             </div>
                         </div>
 
@@ -1153,7 +1197,7 @@ export default function ProfitTrackerDashboard() {
                 </div>
             )}
 
-            {/* OWNER ADMIN PANEL MODAL (GPU Smooth 60FPS) */}
+            {/* OWNER ADMIN PANEL MODAL (ซิงก์ดึงข้อมูลและปรับยศสมาชิกจาก Supabase) */}
             {showOwnerModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 animate-fade-in-up gpu-accelerate">
                     <div className={`border w-full max-w-lg rounded-3xl shadow-2xl p-6 sm:p-8 relative max-h-[90vh] overflow-y-auto gpu-accelerate ${
@@ -1165,8 +1209,8 @@ export default function ProfitTrackerDashboard() {
                                     <Crown className="w-5 h-5" />
                                 </div>
                                 <div>
-                                    <h3 className="text-lg font-black tracking-tight">ระบบจัดการสิทธิ์สมาชิก (Owner Panel)</h3>
-                                    <p className="text-[11px] text-amber-400 font-bold">สำหรับเจ้าของเว็บ {currentUser?.name}</p>
+                                    <h3 className="text-lg font-black tracking-tight">ระบบจัดการสิทธิ์สมาชิก (Supabase Admin)</h3>
+                                    <p className="text-[11px] text-amber-400 font-bold">สำหรับเจ้าของระบบ {currentUser?.name}</p>
                                 </div>
                             </div>
                             <button onClick={() => setShowOwnerModal(false)} className="text-gray-400 hover:text-white p-1 cursor-pointer">
@@ -1213,7 +1257,10 @@ export default function ProfitTrackerDashboard() {
                             </button>
                             <button
                                 type="button"
-                                onClick={() => setOwnerTab('users')}
+                                onClick={() => {
+                                    fetchUsersList()
+                                    setOwnerTab('users')
+                                }}
                                 className={`py-2 rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer ${
                                     ownerTab === 'users' ? 'bg-amber-500 text-white shadow-md' : 'text-gray-400 hover:text-white'
                                 }`}
@@ -1224,7 +1271,7 @@ export default function ProfitTrackerDashboard() {
                             </button>
                         </div>
 
-                        {/* TAB 1: OWNER DIRECTLY CREATES USER ACCOUNT */}
+                        {/* TAB 1: OWNER DIRECTLY CREATES USER ACCOUNT (พร้อมสิทธิ์ยศ) */}
                         {ownerTab === 'create' && (
                             <form onSubmit={handleAdminCreateAccount} className="space-y-4 text-xs">
                                 <div>
@@ -1267,12 +1314,39 @@ export default function ProfitTrackerDashboard() {
                                     />
                                 </div>
 
+                                {/* ปรับยศสิทธิ์เริ่มต้น */}
+                                <div>
+                                    <label className="block font-semibold mb-1.5">กำหนดสิทธิ์ยศเริ่มต้น *</label>
+                                    <div className="flex items-center gap-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => setAdminNewIsAdmin(false)}
+                                            className={`flex-1 py-2.5 rounded-xl border font-bold flex items-center justify-center gap-1.5 cursor-pointer ${
+                                                !adminNewIsAdmin ? 'bg-indigo-600 text-white border-indigo-500' : 'bg-white/5 text-gray-400 border-white/10'
+                                            }`}
+                                        >
+                                            <User className="w-4 h-4" />
+                                            <span>👤 สมาชิกทั่วไป</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setAdminNewIsAdmin(true)}
+                                            className={`flex-1 py-2.5 rounded-xl border font-bold flex items-center justify-center gap-1.5 cursor-pointer ${
+                                                adminNewIsAdmin ? 'bg-amber-500 text-white border-amber-400' : 'bg-white/5 text-gray-400 border-white/10'
+                                            }`}
+                                        >
+                                            <Crown className="w-4 h-4" />
+                                            <span>👑 แอดมิน</span>
+                                        </button>
+                                    </div>
+                                </div>
+
                                 <button
                                     type="submit"
                                     className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl font-bold shadow-lg shadow-amber-500/30 hover:scale-[1.01] active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2 text-sm"
                                 >
                                     <Plus className="w-4 h-4" />
-                                    <span>สร้างบัญชีใหม่ให้ลูกค้าทันที</span>
+                                    <span>สร้างบัญชีลง Supabase ทันที</span>
                                 </button>
                             </form>
                         )}
@@ -1357,26 +1431,69 @@ export default function ProfitTrackerDashboard() {
                             </form>
                         )}
 
-                        {/* TAB 4: ALL USERS LIST */}
+                        {/* TAB 4: ALL USERS LIST (ปรับยศ & ลบบัญชีบน Supabase) */}
                         {ownerTab === 'users' && (
-                            <div className="space-y-3 max-h-[350px] overflow-y-auto text-xs">
+                            <div className="space-y-3 max-h-[380px] overflow-y-auto text-xs">
+                                <div className="flex items-center justify-between pb-1 border-b border-white/10">
+                                    <span className="text-[11px] text-gray-400">รายชื่อสมาชิกทั้งหมดบน Supabase Database:</span>
+                                    <button 
+                                        type="button" 
+                                        onClick={fetchUsersList}
+                                        className="text-[11px] text-amber-400 hover:underline flex items-center gap-1 cursor-pointer"
+                                    >
+                                        <RefreshCw className="w-3 h-3" />
+                                        <span>รีเฟรชข้อมูล</span>
+                                    </button>
+                                </div>
+
                                 {allUsersList.map((u) => (
-                                    <div key={u.id} className={`p-3.5 rounded-xl border flex items-center justify-between ${
+                                    <div key={u.id} className={`p-3.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
                                         isLight ? 'bg-slate-50 border-slate-200' : 'bg-white/5 border-white/10'
                                     }`}>
                                         <div>
                                             <div className="font-bold flex items-center gap-1.5">
-                                                <span>{u.name}</span>
-                                                {(u.name.toLowerCase() === 'sakchawit' || u.isAdmin) && (
-                                                    <span className="px-2 py-0.5 text-[9px] rounded-full bg-amber-500/20 text-amber-400 font-bold border border-amber-500/30">
-                                                        👑 เจ้าของระบบ
+                                                <span className="text-sm">{u.name}</span>
+                                                {(u.name.toLowerCase() === 'sakchawit' || u.isAdmin) ? (
+                                                    <span className="px-2 py-0.5 text-[9px] rounded-full bg-amber-500/20 text-amber-400 font-bold border border-amber-500/30 flex items-center gap-0.5">
+                                                        <Crown className="w-3 h-3" /> 👑 แอดมิน
+                                                    </span>
+                                                ) : (
+                                                    <span className="px-2 py-0.5 text-[9px] rounded-full bg-indigo-500/20 text-indigo-300 font-bold border border-indigo-500/30 flex items-center gap-0.5">
+                                                        <User className="w-3 h-3" /> 👤 สมาชิก
                                                     </span>
                                                 )}
                                             </div>
-                                            <div className="text-gray-400 text-[11px]">{u.email}</div>
+                                            <div className="text-gray-400 text-[11px] mt-0.5">{u.email || 'ไม่มีอีเมล'}</div>
+                                            <div className="font-mono text-[10px] text-indigo-400 mt-0.5">รหัสผ่าน: {u.password}</div>
                                         </div>
-                                        <div className="text-right">
-                                            <span className="font-mono text-[11px] text-indigo-400 font-bold">รหัสผ่าน: {u.password}</span>
+
+                                        {/* Action Buttons for User Role & Delete */}
+                                        <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-center">
+                                            {u.name.toLowerCase() !== 'sakchawit' && (
+                                                <>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleToggleUserRole(u.id, u.name, u.isAdmin)}
+                                                        className={`px-2.5 py-1.5 rounded-xl border font-bold text-[11px] flex items-center gap-1 transition-all cursor-pointer ${
+                                                            u.isAdmin 
+                                                                ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/20' 
+                                                                : 'bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20'
+                                                        }`}
+                                                        title="ปรับเปลี่ยนยศสมาชิก"
+                                                    >
+                                                        {u.isAdmin ? <User className="w-3.5 h-3.5" /> : <Crown className="w-3.5 h-3.5" />}
+                                                        <span>{u.isAdmin ? 'ลดเป็นสมาชิก' : 'ตั้งเป็นแอดมิน'}</span>
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleDeleteUserAccount(u.id, u.name)}
+                                                        className="p-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/20 cursor-pointer"
+                                                        title="ลบบัญชีสมาชิกนี้ออกจาก Supabase"
+                                                    >
+                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                    </button>
+                                                </>
+                                            )}
                                         </div>
                                     </div>
                                 ))}
@@ -1386,7 +1503,7 @@ export default function ProfitTrackerDashboard() {
                 </div>
             )}
 
-            {/* MODAL 1: ADD PROFIT LOG (GPU Smooth 60FPS) */}
+            {/* MODAL 1: ADD PROFIT LOG */}
             {showAddProfitModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 animate-fade-in-up gpu-accelerate">
                     <div className={`border w-full max-w-lg rounded-3xl shadow-2xl p-5 sm:p-8 relative max-h-[90vh] overflow-y-auto gpu-accelerate ${
@@ -1552,7 +1669,7 @@ export default function ProfitTrackerDashboard() {
                 </div>
             )}
 
-            {/* MODAL 2: ADD INSTALLMENT (GPU Smooth 60FPS) */}
+            {/* MODAL 2: ADD INSTALLMENT */}
             {showAddInstallmentModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 animate-fade-in-up gpu-accelerate">
                     <div className={`border w-full max-w-lg rounded-3xl shadow-2xl p-5 sm:p-8 relative max-h-[90vh] overflow-y-auto gpu-accelerate ${

@@ -83,21 +83,75 @@ export async function saveUserToSupabase(user) {
     }
 }
 
-export async function getUsersFromSupabaseRemote() {
+export async function getAllUsersFromSupabase() {
     try {
         const { data, error } = await supabase
             .from('users')
             .select('*')
-        if (error || !data) return null
-        return data.map(u => ({
+            .order('created_at', { ascending: false })
+            
+        if (error || !data || data.length === 0) {
+            return getUsersFromStorage()
+        }
+
+        const formatted = data.map(u => ({
             id: u.id,
             name: u.name,
             email: u.email,
             password: u.password,
-            isAdmin: u.is_admin || false
+            isAdmin: u.is_admin || u.name?.toLowerCase() === 'sakchawit',
+            createdAt: u.created_at
         }))
+
+        // Sync Sakchawit default if missing
+        const hasSakchawit = formatted.some(u => u.name?.toLowerCase() === 'sakchawit')
+        if (!hasSakchawit) {
+            const currentPass = getOwnerPassword()
+            formatted.unshift({ ...DEFAULT_DEMO_USER, password: currentPass })
+        }
+
+        saveUsersToStorage(formatted)
+        return formatted
     } catch {
-        return null
+        return getUsersFromStorage()
+    }
+}
+
+export async function adminToggleUserRoleInSupabase(userId, newIsAdmin) {
+    try {
+        const { error } = await supabase
+            .from('users')
+            .update({ is_admin: newIsAdmin })
+            .eq('id', userId)
+
+        // Update local cache
+        const users = getUsersFromStorage()
+        const updated = users.map(u => u.id === userId ? { ...u, isAdmin: newIsAdmin } : u)
+        saveUsersToStorage(updated)
+
+        return { success: !error }
+    } catch (e) {
+        console.warn('Toggle user role error:', e)
+        return { success: false }
+    }
+}
+
+export async function adminDeleteUserInSupabase(userId) {
+    try {
+        const { error } = await supabase
+            .from('users')
+            .delete()
+            .eq('id', userId)
+
+        // Update local cache
+        const users = getUsersFromStorage()
+        const updated = users.filter(u => u.id !== userId)
+        saveUsersToStorage(updated)
+
+        return { success: !error }
+    } catch (e) {
+        console.warn('Delete user error:', e)
+        return { success: false }
     }
 }
 
@@ -213,7 +267,7 @@ export function logoutUserSession() {
 }
 
 export async function registerNewUser(name, email, password, inviteCode) {
-    const users = getUsersFromStorage()
+    const users = await getAllUsersFromSupabase()
     const trimmedName = name.trim()
     const trimmedEmail = email.trim().toLowerCase()
     const trimmedCode = (inviteCode || '').trim().toLowerCase()
@@ -260,9 +314,9 @@ export async function registerNewUser(name, email, password, inviteCode) {
     return { success: true, user: newUser }
 }
 
-// Owner Admin Function: Directly Create User Account
-export async function adminCreateUserAccount(name, email, password) {
-    const users = getUsersFromStorage()
+// Owner Admin Function: Directly Create User Account (ด้วยสิทธิ์ Admin / สมาชิก)
+export async function adminCreateUserAccount(name, email, password, isAdmin = false) {
+    const users = await getAllUsersFromSupabase()
     const trimmedName = name.trim()
     const trimmedEmail = email.trim().toLowerCase()
 
@@ -279,6 +333,7 @@ export async function adminCreateUserAccount(name, email, password) {
         name: trimmedName,
         email: trimmedEmail,
         password: password,
+        isAdmin: isAdmin,
         createdAt: new Date().toISOString()
     }
 
@@ -289,19 +344,17 @@ export async function adminCreateUserAccount(name, email, password) {
     return { success: true, user: newUser }
 }
 
-export function loginUserAccount(identifier, password) {
-    const users = getUsersFromStorage()
+export async function loginUserAccount(identifier, password) {
     const trimmedId = (identifier || '').trim().toLowerCase()
-    const trimmedPass = (password || '').trim().toLowerCase()
-    const currentOwnerPass = getOwnerPassword().trim().toLowerCase()
+    const trimmedPass = (password || '').trim()
+    const currentOwnerPass = getOwnerPassword().trim()
 
     // 1. Guaranteed Owner Login for sakchawit & admin (Mobile Friendly Case-Insensitive)
     if (trimmedId === 'sakchawit' || trimmedId === 'admin@system.com' || trimmedId === 'admin') {
         if (
-            trimmedPass === currentOwnerPass || 
-            trimmedPass === 'password123' || 
-            trimmedPass === 'sakchawit' ||
-            trimmedPass === '123456'
+            trimmedPass.toLowerCase() === currentOwnerPass.toLowerCase() || 
+            trimmedPass.toLowerCase() === 'password123' || 
+            trimmedPass.toLowerCase() === 'sakchawit'
         ) {
             const ownerUser = {
                 id: 'user_admin_default',
@@ -311,16 +364,18 @@ export function loginUserAccount(identifier, password) {
                 isAdmin: true
             }
             setCurrentUserSession(ownerUser, true)
-            saveUserToSupabase(ownerUser)
+            await saveUserToSupabase(ownerUser)
             return { success: true, user: ownerUser }
         }
     }
 
-    // 2. Normal User Login Match
+    // 2. Query Users directly from Supabase Database
+    const users = await getAllUsersFromSupabase()
+
     const user = users.find(u => {
         const matchesEmail = u.email && u.email.trim().toLowerCase() === trimmedId
         const matchesName = u.name && u.name.trim().toLowerCase() === trimmedId
-        return (matchesEmail || matchesName) && (u.password || '').trim() === password.trim()
+        return (matchesEmail || matchesName) && (u.password || '').trim() === trimmedPass
     })
 
     if (!user) {
