@@ -1,65 +1,1506 @@
-import Image from "next/image";
+'use client'
+import { useState, useMemo, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import NyanCatLoading from '@/components/NyanCatLoading'
+import MoneyParticles from '@/components/MoneyParticles'
+import { 
+    TrendingUp, DollarSign, Clock, AlertCircle, MessageCircle, ShoppingBag, 
+    Plus, Search, Filter, Trash2, Edit, CheckCircle2, X, Store, ArrowUpRight,
+    Sparkles, RefreshCw, LogOut, ChevronDown, Check, CreditCard, User, Layers,
+    Database, Copy, Terminal, ShieldCheck, Flame, PieChart as PieIcon, ArrowRight,
+    Phone, Share2, Calendar, Tag, Wallet, Receipt, AlertTriangle, CheckCircle, Info,
+    Sun, Moon, Calculator, Image as ImageIcon, Upload, Eye, PartyPopper, Rocket
+} from 'lucide-react'
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell, PieChart, Pie } from 'recharts'
+import { 
+    getCurrentUser,
+    logoutUserSession,
+    getUserProfits,
+    saveUserProfits,
+    getUserInstallments,
+    saveUserInstallments,
+    getProfitsFromSupabase,
+    saveProfitToSupabase,
+    deleteProfitFromSupabase,
+    getInstallmentsFromSupabase,
+    saveInstallmentToSupabase,
+    updatePaymentInSupabase,
+    deleteInstallmentFromSupabase
+} from '@/utils/supabaseClient'
 
-export default function Home() {
-  return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.js file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+const CATEGORY_COLORS_DARK = {
+    'ขายไอดี': 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+    'เติมเกม': 'bg-pink-500/20 text-pink-300 border-pink-500/30',
+    'ปล่อยเช่า': 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
+    'อื่นๆ': 'bg-amber-500/20 text-amber-300 border-amber-500/30',
+}
+
+const CATEGORY_COLORS_LIGHT = {
+    'ขายไอดี': 'bg-emerald-100 text-emerald-800 border-emerald-300',
+    'เติมเกม': 'bg-pink-100 text-pink-800 border-pink-300',
+    'ปล่อยเช่า': 'bg-indigo-100 text-indigo-800 border-indigo-300',
+    'อื่นๆ': 'bg-amber-100 text-amber-800 border-amber-300',
+}
+
+const MONTH_ORDER = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.']
+
+export default function ProfitTrackerDashboard() {
+    const router = useRouter()
+
+    // Theme Mode State ('dark' or 'light') & Falling Money Effect
+    const [theme, setTheme] = useState('dark')
+    const [showMoneyParticles, setShowMoneyParticles] = useState(true)
+
+    // Active Authenticated User Session State
+    const [currentUser, setCurrentUser] = useState(null)
+    const [isAuthChecking, setIsAuthChecking] = useState(true)
+
+    // Welcome Pop-up Modal State
+    const [showWelcomeModal, setShowWelcomeModal] = useState(false)
+
+    // Supabase DB connection state
+    const [dbConnected, setDbConnected] = useState(false)
+    const [isFetching, setIsFetching] = useState(true)
+
+    // User-Isolated Data State
+    const [profitLogs, setProfitLogs] = useState([])
+    const [installments, setInstallments] = useState([])
+
+    // Filters
+    const [searchTerm, setSearchTerm] = useState('')
+    const [categoryFilter, setCategoryFilter] = useState('ทั้งหมด')
+    const [installmentFilter, setInstallmentFilter] = useState('all')
+
+    // Modals & Action Dialogs
+    const [showAddProfitModal, setShowAddProfitModal] = useState(false)
+    const [showAddInstallmentModal, setShowAddInstallmentModal] = useState(false)
+    const [paymentModalItem, setPaymentModalItem] = useState(null)
+    const [paymentInput, setPaymentInput] = useState('')
+
+    // Custom Lightbox Preview Image Modal State
+    const [lightboxImage, setLightboxImage] = useState(null)
+
+    // Custom Confirm Delete Modal State
+    const [deleteModalData, setDeleteModalData] = useState(null)
+
+    // Toast Notification
+    const [toastMessage, setToastMessage] = useState('')
+
+    // New Profit Form State (ราคารับ, ราคาขายออก, วันที่ขาย, หมวดหมู่, รูปภาพ)
+    const [profitTitle, setProfitTitle] = useState('')
+    const [profitCategory, setProfitCategory] = useState('ขายไอดี')
+    const [profitCost, setProfitCost] = useState('')
+    const [profitPrice, setProfitPrice] = useState('')
+    const [profitDate, setProfitDate] = useState(() => new Date().toISOString().split('T')[0])
+    const [profitMonth, setProfitMonth] = useState('ส.ค.')
+    const [profitNote, setProfitNote] = useState('')
+    const [profitImage, setProfitImage] = useState('')
+
+    // New Installment Form State (รวมรูปภาพสลิป/สินค้า)
+    const [instCustomer, setInstCustomer] = useState('')
+    const [instItem, setInstItem] = useState('')
+    const [instTotal, setInstTotal] = useState('')
+    const [instPaid, setInstPaid] = useState('')
+    const [instNextDue, setInstNextDue] = useState('')
+    const [instContact, setInstContact] = useState('')
+    const [instContactType, setInstContactType] = useState('Line')
+    const [instImage, setInstImage] = useState('')
+
+    const triggerToast = (msg) => {
+        setToastMessage(msg)
+        setTimeout(() => setToastMessage(''), 3500)
+    }
+
+    // Helper: Handle Local Image File Upload to Base64
+    const handleImageUpload = (e, setImageState) => {
+        const file = e.target.files[0]
+        if (!file) return
+        if (file.size > 5 * 1024 * 1024) {
+            triggerToast('⚠️ กรุณาเลือกไฟล์รูปภาพขนาดไม่เกิน 5MB')
+            return
+        }
+        const reader = new FileReader()
+        reader.onloadend = () => {
+            setImageState(reader.result)
+        }
+        reader.readAsDataURL(file)
+    }
+
+    // Check Auth & Load User Data on mount
+    useEffect(() => {
+        const savedTheme = localStorage.getItem('app_theme')
+        if (savedTheme) setTheme(savedTheme)
+
+        const user = getCurrentUser()
+        if (!user) {
+            router.push('/login')
+            return
+        }
+        setCurrentUser(user)
+        setIsAuthChecking(false)
+
+        // Trigger Welcome Pop-up Modal every time user fresh logs in or registers
+        const justLoggedIn = sessionStorage.getItem('just_logged_in')
+        if (justLoggedIn === 'true') {
+            setShowWelcomeModal(true)
+            sessionStorage.removeItem('just_logged_in')
+        }
+
+        loadUserData(user.id)
+    }, [])
+
+    const toggleTheme = () => {
+        const nextTheme = theme === 'dark' ? 'light' : 'dark'
+        setTheme(nextTheme)
+        localStorage.setItem('app_theme', nextTheme)
+    }
+
+    const loadUserData = async (userId) => {
+        setIsFetching(true)
+
+        const localProfits = getUserProfits(userId)
+        const localInstallments = getUserInstallments(userId)
+
+        setProfitLogs(localProfits)
+        setInstallments(localInstallments)
+
+        const [profitRes, instRes] = await Promise.all([
+            getProfitsFromSupabase(userId),
+            getInstallmentsFromSupabase(userId)
+        ])
+
+        const isRealtime = profitRes.isDatabase || instRes.isDatabase
+        setDbConnected(isRealtime)
+
+        if (profitRes.isDatabase) {
+            setProfitLogs(profitRes.data)
+            saveUserProfits(userId, profitRes.data)
+        }
+        if (instRes.isDatabase) {
+            setInstallments(instRes.data)
+            saveUserInstallments(userId, instRes.data)
+        }
+
+        setIsFetching(false)
+    }
+
+    const updateProfits = (newLogs) => {
+        setProfitLogs(newLogs)
+        if (currentUser) {
+            saveUserProfits(currentUser.id, newLogs)
+        }
+    }
+
+    const updateInstallments = (newInsts) => {
+        setInstallments(newInsts)
+        if (currentUser) {
+            saveUserInstallments(currentUser.id, newInsts)
+        }
+    }
+
+    const handleLogout = () => {
+        logoutUserSession()
+        triggerToast('👋 ออกจากระบบเรียบร้อยแล้ว')
+        setTimeout(() => router.push('/login'), 400)
+    }
+
+    // 100% ACCURATE REALTIME CHART CALCULATIONS
+    const monthlySummary = useMemo(() => {
+        const monthsMap = {}
+
+        MONTH_ORDER.forEach(m => {
+            monthsMap[m] = { month: m, กำไร: 0, ยอดขาย: 0, ยอดผ่อน: 0 }
+        })
+
+        profitLogs.forEach(log => {
+            const m = log.month || 'ส.ค.'
+            if (!monthsMap[m]) {
+                monthsMap[m] = { month: m, กำไร: 0, ยอดขาย: 0, ยอดผ่อน: 0 }
+            }
+            monthsMap[m].กำไร += Number(log.profit || 0)
+            monthsMap[m].ยอดขาย += Number(log.price || 0)
+        })
+
+        installments.forEach(inst => {
+            const m = 'ส.ค.'
+            if (monthsMap[m]) {
+                monthsMap[m].ยอดผ่อน += Number(inst.total || 0)
+            }
+        })
+
+        return MONTH_ORDER.map(m => monthsMap[m])
+    }, [profitLogs, installments])
+
+    // Overall Totals
+    const totalProfit = useMemo(() => {
+        return profitLogs.reduce((acc, item) => acc + Number(item.profit || 0), 0)
+    }, [profitLogs])
+
+    const totalSalesValue = useMemo(() => {
+        return profitLogs.reduce((acc, item) => acc + Number(item.price || 0), 0)
+    }, [profitLogs])
+
+    const totalInstallmentOutstanding = useMemo(() => {
+        return installments.reduce((acc, item) => {
+            if (item.nextDue !== 'ชำระครบแล้ว') {
+                return acc + (Number(item.total) - Number(item.paid))
+            }
+            return acc
+        }, 0)
+    }, [installments])
+
+    const activeInstallmentsCount = useMemo(() => {
+        return installments.filter(item => item.nextDue !== 'ชำระครบแล้ว').length
+    }, [installments])
+
+    // Category Profit Pie Chart Data
+    const categoryPieData = useMemo(() => {
+        const categories = {}
+        profitLogs.forEach(log => {
+            categories[log.category] = (categories[log.category] || 0) + Number(log.profit || 0)
+        })
+        const result = Object.keys(categories).map(cat => ({
+            name: cat,
+            value: categories[cat]
+        }))
+        return result.length > 0 ? result : [{ name: 'ไม่มีข้อมูล', value: 1 }]
+    }, [profitLogs])
+
+    const PIE_COLORS = ['#10b981', '#ec4899', '#6366f1', '#f59e0b']
+
+    // Handlers
+    const handleAddProfit = async (e) => {
+        e.preventDefault()
+        if (!profitTitle || !profitPrice || !currentUser) {
+            triggerToast('⚠️ กรุณากรอกชื่อรายการและราคาขายออกให้ครบถ้วน')
+            return
+        }
+
+        const costNum = parseFloat(profitCost) || 0
+        const priceNum = parseFloat(profitPrice) || 0
+        const netProfit = priceNum - costNum
+
+        let monthName = profitMonth || 'ส.ค.'
+        if (profitDate) {
+            const dateObj = new Date(profitDate)
+            if (!isNaN(dateObj.getTime())) {
+                const monthIndex = dateObj.getMonth()
+                monthName = MONTH_ORDER[monthIndex] || profitMonth
+            }
+        }
+
+        const newLog = {
+            id: `PR_${Date.now().toString().slice(-6)}`,
+            title: profitTitle,
+            category: profitCategory,
+            cost: costNum,
+            price: priceNum,
+            profit: netProfit,
+            date: profitDate || new Date().toISOString().split('T')[0],
+            month: monthName,
+            note: profitNote || 'บันทึกรายรับใหม่',
+            image: profitImage || ''
+        }
+
+        const updated = [newLog, ...profitLogs]
+        updateProfits(updated)
+
+        await saveProfitToSupabase(newLog, currentUser.id)
+        triggerToast(`💰 บันทึกกำไร "${profitTitle}" (+${netProfit.toLocaleString()} ฿) เรียบร้อย!`)
+
+        setProfitTitle('')
+        setProfitCost('')
+        setProfitPrice('')
+        setProfitNote('')
+        setProfitImage('')
+        setShowAddProfitModal(false)
+    }
+
+    const handleAddInstallment = async (e) => {
+        e.preventDefault()
+        if (!instCustomer || !instItem || !instTotal || !currentUser) {
+            triggerToast('⚠️ กรุณากรอกข้อมูลลูกค้า สินค้า และราคาเต็ม')
+            return
+        }
+
+        const totalNum = parseFloat(instTotal) || 0
+        const paidNum = parseFloat(instPaid) || 0
+        const isCompleted = paidNum >= totalNum
+
+        const newInst = {
+            id: `IV_${Date.now().toString().slice(-6)}`,
+            customer: instCustomer,
+            item: instItem,
+            total: totalNum,
+            paid: paidNum,
+            nextDue: isCompleted ? 'ชำระครบแล้ว' : (instNextDue || '15 ส.ค. 67'),
+            contact: instContact || 'https://lin.ee/VjBjIVjU',
+            contactType: instContactType,
+            status: isCompleted ? 'completed' : 'active',
+            image: instImage || ''
+        }
+
+        const updated = [newInst, ...installments]
+        updateInstallments(updated)
+
+        await saveInstallmentToSupabase(newInst, currentUser.id)
+        triggerToast(`📝 เพิ่มสัญญาผ่อน ${newInst.id} ของ ${instCustomer} สำเร็จ!`)
+
+        setInstCustomer('')
+        setInstItem('')
+        setInstTotal('')
+        setInstPaid('')
+        setInstNextDue('')
+        setInstContact('')
+        setInstImage('')
+        setShowAddInstallmentModal(false)
+    }
+
+    const handleRecordPayment = async (e) => {
+        e.preventDefault()
+        if (!paymentModalItem || !paymentInput || !currentUser) return
+
+        const amount = parseFloat(paymentInput) || 0
+        if (amount <= 0) return
+
+        let updatedNextDue = paymentModalItem.nextDue
+        let updatedStatus = paymentModalItem.status
+        let updatedPaid = paymentModalItem.paid + amount
+
+        if (updatedPaid >= paymentModalItem.total) {
+            updatedNextDue = 'ชำระครบแล้ว'
+            updatedStatus = 'completed'
+        }
+
+        const updated = installments.map(item => {
+            if (item.id === paymentModalItem.id) {
+                return {
+                    ...item,
+                    paid: updatedPaid,
+                    nextDue: updatedNextDue,
+                    status: updatedStatus
+                }
+            }
+            return item
+        })
+
+        updateInstallments(updated)
+        await updatePaymentInSupabase(paymentModalItem.id, updatedPaid, updatedStatus, updatedNextDue, currentUser.id)
+
+        triggerToast(`💵 บันทึกค่างวด +${amount.toLocaleString()} ฿ สำหรับ ${paymentModalItem.customer} สำเร็จ!`)
+        setPaymentModalItem(null)
+        setPaymentInput('')
+    }
+
+    const confirmDeleteAction = async () => {
+        if (!deleteModalData || !currentUser) return
+
+        if (deleteModalData.type === 'profit') {
+            const updated = profitLogs.filter(item => item.id !== deleteModalData.id)
+            updateProfits(updated)
+            await deleteProfitFromSupabase(deleteModalData.title, currentUser.id)
+            triggerToast(`🗑️ ลบบันทึกกำไร "${deleteModalData.title}" ถาวรเรียบร้อย!`)
+        } else if (deleteModalData.type === 'installment') {
+            const updated = installments.filter(item => item.id !== deleteModalData.id)
+            updateInstallments(updated)
+            await deleteInstallmentFromSupabase(deleteModalData.id, currentUser.id)
+            triggerToast(`🗑️ ลบรายการผ่อน ${deleteModalData.id} ถาวรเรียบร้อย!`)
+        }
+
+        setDeleteModalData(null)
+    }
+
+    const isLight = theme === 'light'
+    const categoryColors = isLight ? CATEGORY_COLORS_LIGHT : CATEGORY_COLORS_DARK
+
+    // Live Calculated Profit for Form Preview
+    const calculatedProfitPreview = useMemo(() => {
+        const cost = parseFloat(profitCost) || 0
+        const price = parseFloat(profitPrice) || 0
+        return price - cost
+    }, [profitCost, profitPrice])
+
+    if (isAuthChecking) {
+        return <NyanCatLoading text="กำลังโหลดข้อมูลบัญชี... 🌈" isLight={isLight} />
+    }
+
+    return (
+        <div className={`min-h-screen flex flex-col font-sans relative overflow-hidden transition-colors duration-150 ${
+            isLight ? 'bg-slate-100 text-slate-900 selection:bg-indigo-600 selection:text-white' : 'bg-[#08080c] text-gray-100 selection:bg-indigo-500 selection:text-white'
+        }`}>
+            
+            {/* Falling Money Particles Effect */}
+            <MoneyParticles active={showMoneyParticles} count={28} />
+
+            {/* Ambient Background Aura Blobs */}
+            <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
+                <div className={`absolute top-[-10%] left-[-10%] w-[450px] sm:w-[550px] h-[450px] sm:h-[550px] rounded-full blur-[100px] transition-opacity duration-200 ${
+                    isLight ? 'bg-indigo-300/40' : 'bg-indigo-600/20'
+                }`}></div>
+                <div className={`absolute bottom-[10%] right-[-5%] w-[400px] sm:w-[500px] h-[400px] sm:h-[500px] rounded-full blur-[100px] transition-opacity duration-200 ${
+                    isLight ? 'bg-purple-300/40' : 'bg-purple-600/20'
+                }`}></div>
+            </div>
+
+            {/* Floating Toast Notification */}
+            {toastMessage && (
+                <div className={`fixed top-4 right-4 left-4 sm:left-auto z-50 px-4 py-3 rounded-2xl shadow-2xl flex items-center justify-center sm:justify-start gap-2.5 animate-fade-in-up border backdrop-blur-xl ${
+                    isLight ? 'bg-white/95 border-slate-200 text-slate-900 shadow-slate-300/50' : 'bg-[#16192b]/95 border-indigo-500/40 text-white'
+                }`}>
+                    <Sparkles className="w-4 h-4 text-amber-400 animate-spin shrink-0" />
+                    <span className="text-xs sm:text-sm font-semibold truncate">{toastMessage}</span>
+                </div>
+            )}
+
+            {/* Header Navbar */}
+            <header className={`sticky top-0 z-40 backdrop-blur-xl border-b px-3 sm:px-8 py-3 transition-all duration-150 ${
+                isLight ? 'bg-white/85 border-slate-200/80' : 'bg-[#08080c]/85 border-white/10'
+            }`}>
+                <div className="max-w-7xl mx-auto flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-indigo-500 via-purple-600 to-pink-500 p-0.5 shadow-lg shadow-indigo-500/30 shrink-0">
+                            <div className={`w-full h-full rounded-[10px] flex items-center justify-center ${isLight ? 'bg-white' : 'bg-[#0d0e17]'}`}>
+                                <Wallet className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-500" />
+                            </div>
+                        </div>
+                        <div className="min-w-0">
+                            <div className={`font-black text-sm sm:text-lg tracking-tight truncate ${
+                                isLight ? 'text-slate-900' : 'text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400'
+                            }`}>
+                                PROFIT & INSTALLMENT
+                            </div>
+                            <div className={`text-[9px] sm:text-[10px] font-medium -mt-0.5 tracking-wider uppercase truncate ${isLight ? 'text-slate-500' : 'text-gray-400'}`}>
+                                ระบบจดกำไร & ยอดผ่อน
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Right Header Actions */}
+                    <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+                        <button
+                            type="button"
+                            onClick={() => setShowMoneyParticles(!showMoneyParticles)}
+                            className={`px-2.5 py-1.5 rounded-xl border text-xs font-bold transition-all shadow-sm cursor-pointer flex items-center gap-1 ${
+                                showMoneyParticles 
+                                    ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400' 
+                                    : isLight 
+                                        ? 'bg-slate-100 border-slate-200 text-slate-500' 
+                                        : 'bg-white/5 border-white/10 text-gray-400'
+                            }`}
+                            title="เปิด/ปิด เอฟเฟกต์เงินร่วง"
+                        >
+                            <span>💸</span>
+                            <span className="hidden sm:inline">{showMoneyParticles ? 'เงินร่วง' : 'ปิดเอฟเฟกต์'}</span>
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={toggleTheme}
+                            className={`p-2 sm:px-3 sm:py-1.5 rounded-xl border text-xs font-bold transition-all shadow-sm cursor-pointer ${
+                                isLight 
+                                    ? 'bg-slate-100 border-slate-200 text-slate-800 hover:bg-slate-200' 
+                                    : 'bg-white/5 border-white/10 text-gray-200 hover:bg-white/10'
+                            }`}
+                            title="สลับโหมดสว่าง/มืด"
+                        >
+                            {isLight ? <Moon className="w-4 h-4 text-indigo-600" /> : <Sun className="w-4 h-4 text-amber-400" />}
+                        </button>
+
+                        <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-bold ${
+                            isLight ? 'bg-slate-100 border-slate-200 text-slate-800' : 'bg-white/5 border-white/10 text-gray-200'
+                        }`}>
+                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
+                            <span className="max-w-[70px] sm:max-w-[130px] truncate">{currentUser?.name || currentUser?.email}</span>
+                        </div>
+
+                        <button
+                            onClick={handleLogout}
+                            className="p-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-400 transition-colors cursor-pointer"
+                            title="ออกจากระบบ"
+                        >
+                            <LogOut className="w-4 h-4" />
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <main className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-6 lg:p-8 space-y-6 sm:space-y-8 relative z-10">
+                
+                {/* Dashboard Title & CTAs */}
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div>
+                        <h1 className={`text-2xl sm:text-3xl lg:text-4xl font-black ${
+                            isLight ? 'text-slate-900' : 'text-transparent bg-clip-text bg-gradient-to-r from-white via-gray-100 to-gray-400'
+                        }`}>
+                            💼 ระบบบันทึกกำไร & ยอดผ่อนชำระ
+                        </h1>
+                        <p className={`text-xs sm:text-sm mt-0.5 ${isLight ? 'text-slate-600' : 'text-gray-400'}`}>
+                            บัญชีของคุณ <span className="text-indigo-500 font-bold">{currentUser?.name}</span> • แยกข้อมูลเฉพาะบัญชีนี้ 100%
+                        </p>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full sm:w-auto">
+                        <button
+                            onClick={() => setShowAddProfitModal(true)}
+                            className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 rounded-xl font-bold text-white shadow-lg shadow-emerald-600/30 hover:scale-105 active:scale-95 transition-all text-xs sm:text-sm cursor-pointer"
+                        >
+                            <Plus className="w-4 h-4" />
+                            <span>+ บันทึกกำไรขายออก</span>
+                        </button>
+                        <button
+                            onClick={() => setShowAddInstallmentModal(true)}
+                            className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 rounded-xl font-bold text-white shadow-lg shadow-indigo-600/30 hover:scale-105 active:scale-95 transition-all text-xs sm:text-sm cursor-pointer"
+                        >
+                            <Plus className="w-4 h-4" />
+                            <span>+ เพิ่มรายการผ่อนใหม่</span>
+                        </button>
+                    </div>
+                </div>
+
+                {/* Stat Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-5">
+                    <div className={`p-5 sm:p-6 rounded-2xl border backdrop-blur-xl transition-all duration-300 group relative overflow-hidden ${
+                        isLight ? 'bg-white/80 border-slate-200/80 shadow-xl shadow-slate-200/50 hover:border-emerald-500' : 'bg-[#10121e]/80 border-white/10 hover:border-emerald-500/50'
+                    }`}>
+                        <div className="flex justify-between items-start mb-3">
+                            <div className="p-2.5 bg-emerald-500/10 rounded-xl text-emerald-500 border border-emerald-500/20">
+                                <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6" />
+                            </div>
+                            <span className="text-[11px] font-bold text-emerald-600 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+                                สรุปกำไรสุทธิ
+                            </span>
+                        </div>
+                        <h3 className={`text-xs font-medium mb-0.5 ${isLight ? 'text-slate-500' : 'text-gray-400'}`}>กำไรขายออกสะสม</h3>
+                        <p className="text-2.5xl sm:text-3.5xl font-black text-emerald-500">+{totalProfit.toLocaleString()} ฿</p>
+                    </div>
+
+                    <div className={`p-5 sm:p-6 rounded-2xl border backdrop-blur-xl transition-all duration-300 group relative overflow-hidden ${
+                        isLight ? 'bg-white/80 border-slate-200/80 shadow-xl shadow-slate-200/50 hover:border-purple-500' : 'bg-[#10121e]/80 border-white/10 hover:border-purple-500/50'
+                    }`}>
+                        <div className="flex justify-between items-start mb-3">
+                            <div className="p-2.5 bg-purple-500/10 rounded-xl text-purple-500 border border-purple-500/20">
+                                <DollarSign className="w-5 h-5 sm:w-6 sm:h-6" />
+                            </div>
+                            <span className="text-[11px] font-bold text-purple-600 bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 rounded-full">
+                                ยอดขายรวม
+                            </span>
+                        </div>
+                        <h3 className={`text-xs font-medium mb-0.5 ${isLight ? 'text-slate-500' : 'text-gray-400'}`}>มูลค่าสินค้ารวมที่ขาย</h3>
+                        <p className={`text-2.5xl sm:text-3.5xl font-black ${isLight ? 'text-slate-900' : 'text-white'}`}>{totalSalesValue.toLocaleString()} ฿</p>
+                    </div>
+
+                    <div className={`p-5 sm:p-6 rounded-2xl border backdrop-blur-xl transition-all duration-300 group relative overflow-hidden ${
+                        isLight ? 'bg-white/80 border-slate-200/80 shadow-xl shadow-slate-200/50 hover:border-amber-500' : 'bg-[#10121e]/80 border-white/10 hover:border-amber-500/50'
+                    }`}>
+                        <div className="flex justify-between items-start mb-3">
+                            <div className="p-2.5 bg-amber-500/10 rounded-xl text-amber-500 border border-amber-500/20">
+                                <Clock className="w-5 h-5 sm:w-6 sm:h-6" />
+                            </div>
+                            <span className="text-[11px] font-bold text-amber-600 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full">
+                                {activeInstallmentsCount} รายการผ่อน
+                            </span>
+                        </div>
+                        <h3 className={`text-xs font-medium mb-0.5 ${isLight ? 'text-slate-500' : 'text-gray-400'}`}>ยอดค้างผ่อน (รอรับ)</h3>
+                        <p className="text-2.5xl sm:text-3.5xl font-black text-amber-500">{totalInstallmentOutstanding.toLocaleString()} ฿</p>
+                    </div>
+
+                    <div className={`p-5 sm:p-6 rounded-2xl border backdrop-blur-xl transition-all duration-300 group relative overflow-hidden ${
+                        isLight ? 'bg-white/80 border-slate-200/80 shadow-xl shadow-slate-200/50 hover:border-pink-500' : 'bg-[#10121e]/80 border-white/10 hover:border-pink-500/50'
+                    }`}>
+                        <div className="flex justify-between items-start mb-3">
+                            <div className="p-2.5 bg-pink-500/10 rounded-xl text-pink-500 border border-pink-500/20">
+                                <Receipt className="w-5 h-5 sm:w-6 sm:h-6" />
+                            </div>
+                            <span className="text-[11px] font-bold text-pink-600 bg-pink-500/10 border border-pink-500/20 px-2 py-0.5 rounded-full">
+                                รายการทั้งหมด
+                            </span>
+                        </div>
+                        <h3 className={`text-xs font-medium mb-0.5 ${isLight ? 'text-slate-500' : 'text-gray-400'}`}>จำนวนออเดอร์ในระบบ</h3>
+                        <p className="text-2.5xl sm:text-3.5xl font-black text-pink-500">{profitLogs.length + installments.length} ออเดอร์</p>
+                    </div>
+                </div>
+
+                {/* Visual Charts Section */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-6">
+                    <div className={`lg:col-span-2 p-4 sm:p-6 rounded-2xl border backdrop-blur-xl ${
+                        isLight ? 'bg-white/80 border-slate-200/80 shadow-xl shadow-slate-200/50' : 'bg-[#10121e]/80 border-white/10'
+                    }`}>
+                        <div className="flex justify-between items-center mb-3 sm:mb-4">
+                            <div>
+                                <h3 className={`text-base sm:text-lg font-bold flex items-center gap-2 ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                                    <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-500" />
+                                    กราฟแนวโน้มกำไรและยอดขายประจำเดือน ({currentUser?.name})
+                                </h3>
+                                <p className={`text-[11px] sm:text-xs ${isLight ? 'text-slate-500' : 'text-gray-400'}`}>คำนวณผลรวมจากรายการบันทึกจริงของบัญชีนี้โดยอัตโนมัติ</p>
+                            </div>
+                        </div>
+                        <ResponsiveContainer width="100%" height={240}>
+                            <AreaChart data={monthlySummary}>
+                                <defs>
+                                    <linearGradient id="colorProfit" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.8} />
+                                        <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                                    </linearGradient>
+                                    <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#ec4899" stopOpacity={0.8} />
+                                        <stop offset="95%" stopColor="#ec4899" stopOpacity={0} />
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" stroke={isLight ? '#e2e8f0' : '#ffffff10'} />
+                                <XAxis dataKey="month" stroke={isLight ? '#64748b' : '#9ca3af'} fontSize={11} />
+                                <YAxis stroke={isLight ? '#64748b' : '#9ca3af'} fontSize={11} />
+                                <Tooltip
+                                    contentStyle={{ 
+                                        background: isLight ? '#ffffff' : '#161828', 
+                                        border: isLight ? '1px solid #cbd5e1' : '1px solid rgba(255,255,255,0.1)', 
+                                        borderRadius: '12px', 
+                                        color: isLight ? '#0f172a' : '#fff' 
+                                    }}
+                                />
+                                <Area type="monotone" dataKey="ยอดขาย" stroke="#ec4899" fillOpacity={1} fill="url(#colorSales)" strokeWidth={2} />
+                                <Area type="monotone" dataKey="กำไร" stroke="#8b5cf6" fillOpacity={1} fill="url(#colorProfit)" strokeWidth={2} />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    </div>
+
+                    <div className={`p-4 sm:p-6 rounded-2xl border backdrop-blur-xl flex flex-col justify-between ${
+                        isLight ? 'bg-white/80 border-slate-200/80 shadow-xl shadow-slate-200/50' : 'bg-[#10121e]/80 border-white/10'
+                    }`}>
+                        <div>
+                            <h3 className={`text-base sm:text-lg font-bold flex items-center gap-2 mb-1 ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                                <PieIcon className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-500" />
+                                สัดส่วนกำไรแยกตามหมวดหมู่
+                            </h3>
+                            <p className={`text-[11px] sm:text-xs mb-3 ${isLight ? 'text-slate-500' : 'text-gray-400'}`}>คำนวณจากกำไรจริงของบัญชีนี้</p>
+                            <ResponsiveContainer width="100%" height={180}>
+                                <PieChart>
+                                    <Pie
+                                        data={categoryPieData}
+                                        cx="50%"
+                                        cy="50%"
+                                        innerRadius={45}
+                                        outerRadius={75}
+                                        paddingAngle={4}
+                                        dataKey="value"
+                                    >
+                                        {categoryPieData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip
+                                        contentStyle={{ 
+                                            background: isLight ? '#ffffff' : '#161828', 
+                                            border: isLight ? '1px solid #cbd5e1' : '1px solid rgba(255,255,255,0.1)', 
+                                            borderRadius: '12px', 
+                                            color: isLight ? '#0f172a' : '#fff' 
+                                        }}
+                                    />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        </div>
+                        <div className={`grid grid-cols-2 gap-2 text-xs pt-3 border-t ${isLight ? 'border-slate-200' : 'border-white/10'}`}>
+                            {categoryPieData.map((item, idx) => (
+                                <div key={idx} className="flex items-center gap-1.5">
+                                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: PIE_COLORS[idx % PIE_COLORS.length] }}></span>
+                                    <span className={`truncate text-[11px] ${isLight ? 'text-slate-700' : 'text-gray-300'}`}>{item.name}: <strong className={isLight ? 'text-slate-900' : 'text-white'}>{item.value.toLocaleString()} ฿</strong></span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+
+                {/* SECTION 1: PROFIT CARDS */}
+                <div className="space-y-4">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                        <div>
+                            <h2 className={`text-xl sm:text-2xl font-black flex items-center gap-2 ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                                <Sparkles className="w-5 h-5 text-amber-400" />
+                                การ์ดบันทึกกำไรขายออกทั้งหมด ({profitLogs.length})
+                            </h2>
+                            <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-500' : 'text-gray-400'}`}>การ์ดแสดงรูปสินค้า รายรับ ต้นทุน และกำไรสุทธิของการขายแต่ละออเดอร์</p>
+                        </div>
+                        <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-start">
+                            <span className={`text-xs font-medium ${isLight ? 'text-slate-600' : 'text-gray-400'}`}>กรองหมวดหมู่:</span>
+                            <select
+                                value={categoryFilter}
+                                onChange={(e) => setCategoryFilter(e.target.value)}
+                                className={`border rounded-xl px-3 py-1.5 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500 ${
+                                    isLight ? 'bg-white border-slate-300 text-slate-800' : 'bg-white/5 border-white/10 text-white'
+                                }`}
+                            >
+                                <option value="ทั้งหมด">ทั้งหมด</option>
+                                <option value="ขายไอดี">ขายไอดี</option>
+                                <option value="เติมเกม">เติมเกม</option>
+                                <option value="ปล่อยเช่า">ปล่อยเช่า</option>
+                                <option value="อื่นๆ">อื่นๆ</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    {/* Cards Grid */}
+                    {profitLogs.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+                            {profitLogs
+                                .filter(item => categoryFilter === 'ทั้งหมด' || item.category === categoryFilter)
+                                .map((log) => (
+                                    <div
+                                        key={log.id}
+                                        className={`rounded-2xl border backdrop-blur-xl transition-all duration-300 relative group overflow-hidden flex flex-col justify-between hover:-translate-y-1 ${
+                                            isLight 
+                                                ? 'bg-white/90 border-slate-200/80 shadow-lg shadow-slate-200/50 hover:border-indigo-400' 
+                                                : 'bg-[#10121e]/90 border-white/10 hover:border-indigo-500/50'
+                                        }`}
+                                    >
+                                        {log.image && (
+                                            <div className="relative w-full h-40 overflow-hidden bg-black/40 group/img cursor-pointer" onClick={() => setLightboxImage(log.image)}>
+                                                <img 
+                                                    src={log.image} 
+                                                    alt={log.title} 
+                                                    className="w-full h-full object-cover group-hover/img:scale-105 transition-transform duration-300"
+                                                />
+                                                <div className="absolute inset-0 bg-black/30 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center text-white font-bold text-xs gap-1">
+                                                    <Eye className="w-4 h-4" />
+                                                    <span>คลิกดูรูปขยาย</span>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        <div className="p-5 sm:p-6">
+                                            <div className="flex items-center justify-between mb-2.5">
+                                                <span className={`text-[10px] sm:text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${categoryColors[log.category] || categoryColors['อื่นๆ']}`}>
+                                                    {log.category}
+                                                </span>
+                                                <div className={`flex items-center gap-1 text-[11px] font-mono ${isLight ? 'text-slate-500' : 'text-gray-400'}`}>
+                                                    <Calendar className="w-3.5 h-3.5 text-gray-400" />
+                                                    <span>{log.date}</span>
+                                                </div>
+                                            </div>
+
+                                            <h3 className={`text-sm sm:text-base font-bold mb-3 transition-colors leading-snug ${isLight ? 'text-slate-900 group-hover:text-indigo-600' : 'text-white group-hover:text-indigo-300'}`}>
+                                                {log.title}
+                                            </h3>
+
+                                            <div className={`grid grid-cols-2 gap-2.5 mb-3.5 p-2.5 rounded-xl border text-xs ${
+                                                isLight ? 'bg-slate-50 border-slate-200' : 'bg-white/[0.03] border-white/5'
+                                            }`}>
+                                                <div>
+                                                    <div className={`text-[10px] ${isLight ? 'text-slate-500' : 'text-gray-400'}`}>ราคารับ (Cost)</div>
+                                                    <div className={`font-bold ${isLight ? 'text-slate-700' : 'text-gray-300'}`}>{log.cost.toLocaleString()} ฿</div>
+                                                </div>
+                                                <div>
+                                                    <div className={`text-[10px] ${isLight ? 'text-slate-500' : 'text-gray-400'}`}>ราคาขายออก (Price)</div>
+                                                    <div className={`font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>{log.price.toLocaleString()} ฿</div>
+                                                </div>
+                                            </div>
+
+                                            {log.note && (
+                                                <div className={`text-[11px] p-2 rounded-lg mb-3 ${isLight ? 'bg-slate-100 text-slate-600' : 'bg-white/5 text-gray-400'}`}>
+                                                    📝 {log.note}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div className={`p-5 sm:p-6 pt-0 border-t flex items-center justify-between mt-auto ${isLight ? 'border-slate-200' : 'border-white/10'}`}>
+                                            <div className="pt-3">
+                                                <span className={`text-[10px] block ${isLight ? 'text-slate-500' : 'text-gray-400'}`}>กำไรสุทธิ (Net Profit)</span>
+                                                <span className="text-lg sm:text-xl font-black text-emerald-500">+{log.profit.toLocaleString()} ฿</span>
+                                            </div>
+                                            <button
+                                                onClick={() => setDeleteModalData({ type: 'profit', id: log.id, title: log.title })}
+                                                className="p-2 mt-3 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/20 transition-all cursor-pointer"
+                                                title="ลบบันทึกนี้ถาวร"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                        </div>
+                    ) : (
+                        <div className={`p-8 sm:p-10 rounded-2xl border text-center ${
+                            isLight ? 'bg-white/60 border-slate-200' : 'bg-white/[0.02] border-white/5'
+                        }`}>
+                            <Sparkles className="w-8 h-8 text-indigo-400 mx-auto mb-2" />
+                            <h3 className={`text-sm sm:text-base font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>ยังไม่มีรายการบันทึกกำไรในบัญชีนี้</h3>
+                            <p className={`text-xs mt-1 mb-4 ${isLight ? 'text-slate-500' : 'text-gray-400'}`}>กดปุ่ม "+ บันทึกกำไรขายออก" ด้านบนเพื่อเริ่มบันทึกรายการแรกของคุณ</p>
+                            <button
+                                onClick={() => setShowAddProfitModal(true)}
+                                className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl text-xs font-bold shadow-md"
+                            >
+                                + บันทึกกำไรขายออก
+                            </button>
+                        </div>
+                    )}
+                </div>
+
+                {/* SECTION 2: INSTALLMENTS & CUSTOMER CONTACTS */}
+                <div className={`p-4 sm:p-6 rounded-2xl border backdrop-blur-xl space-y-4 sm:space-y-6 ${
+                    isLight ? 'bg-white/80 border-slate-200/80 shadow-xl shadow-slate-200/50' : 'bg-[#10121e]/80 border-white/10'
+                }`}>
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+                        <div>
+                            <h2 className={`text-lg sm:text-xl font-bold flex items-center gap-2 ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                                <ShoppingBag className="w-5 h-5 text-indigo-500" />
+                                ตารางจดยอดผ่อนชำระสินค้า & ช่องทางติดต่อลูกค้า ({installments.length})
+                            </h2>
+                            <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-500' : 'text-gray-400'}`}>ติดตามยอดค้างชำระ ดูรูปสินค้า/สลิป บันทึกค่างวด และทักหาลูกค้าได้ทันที</p>
+                        </div>
+
+                        {/* Search & Filter */}
+                        <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
+                            <div className="relative flex-1 sm:w-64 w-full">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                <input
+                                    type="text"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    placeholder="ค้นหาชื่อลูกค้า / สินค้า / รหัส..."
+                                    className={`w-full border rounded-xl py-2 pl-9 pr-3 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500 ${
+                                        isLight ? 'bg-white border-slate-300 text-slate-900 placeholder-slate-400' : 'bg-white/5 border-white/10 text-white placeholder-gray-500'
+                                    }`}
+                                />
+                            </div>
+
+                            <div className={`flex items-center p-1 rounded-xl border text-xs font-semibold w-full sm:w-auto justify-center ${
+                                isLight ? 'bg-slate-100 border-slate-200' : 'bg-white/5 border-white/10'
+                            }`}>
+                                <button
+                                    onClick={() => setInstallmentFilter('all')}
+                                    className={`flex-1 sm:flex-initial px-3 py-1 rounded-lg transition-colors ${installmentFilter === 'all' ? 'bg-indigo-600 text-white' : isLight ? 'text-slate-600' : 'text-gray-400'}`}
+                                >
+                                    ทั้งหมด
+                                </button>
+                                <button
+                                    onClick={() => setInstallmentFilter('active')}
+                                    className={`flex-1 sm:flex-initial px-3 py-1 rounded-lg transition-colors ${installmentFilter === 'active' ? 'bg-indigo-600 text-white' : isLight ? 'text-slate-600' : 'text-gray-400'}`}
+                                >
+                                    กำลังผ่อน
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Touch Horizontal Scrollable Installment Table */}
+                    <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+                        <table className="w-full text-left border-collapse min-w-[750px]">
+                            <thead>
+                                <tr className={`border-b text-xs font-semibold uppercase tracking-wider ${
+                                    isLight ? 'border-slate-200 text-slate-500' : 'border-white/10 text-gray-400'
+                                }`}>
+                                    <th className="py-3 px-3">รูปภาพ</th>
+                                    <th className="py-3 px-3">รหัส / ลูกค้า</th>
+                                    <th className="py-3 px-3">สินค้าที่ผ่อน</th>
+                                    <th className="py-3 px-3 text-right">ราคาเต็ม</th>
+                                    <th className="py-3 px-3 text-right">ชำระแล้ว</th>
+                                    <th className="py-3 px-3 text-right">ค้างผ่อน</th>
+                                    <th className="py-3 px-3 text-center">ความคืบหน้า</th>
+                                    <th className="py-3 px-3 text-center">ช่องทางติดต่อลูกค้า</th>
+                                    <th className="py-3 px-3 text-center">จัดการ</th>
+                                </tr>
+                            </thead>
+                            <tbody className={`text-xs divide-y ${isLight ? 'divide-slate-200' : 'divide-white/5'}`}>
+                                {installments.length > 0 ? (
+                                    installments
+                                        .filter(item => {
+                                            const matchesSearch = item.customer.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                                                                  item.item.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                                                  item.id.toLowerCase().includes(searchTerm.toLowerCase())
+                                            if (!matchesSearch) return false
+                                            if (installmentFilter === 'active') return item.nextDue !== 'ชำระครบแล้ว'
+                                            return true
+                                        })
+                                        .map((item) => {
+                                            const remaining = item.total - item.paid
+                                            const percent = Math.round((item.paid / item.total) * 100)
+                                            const isDone = item.nextDue === 'ชำระครบแล้ว'
+
+                                            return (
+                                                <tr key={item.id} className={`transition-colors ${isLight ? 'hover:bg-slate-100/60' : 'hover:bg-white/[0.02]'}`}>
+                                                    <td className="py-3.5 px-3">
+                                                        {item.image ? (
+                                                            <div className="w-10 h-10 rounded-xl overflow-hidden border border-indigo-500/30 cursor-pointer shadow-md" onClick={() => setLightboxImage(item.image)}>
+                                                                <img src={item.image} alt={item.item} className="w-full h-full object-cover hover:scale-110 transition-transform" />
+                                                            </div>
+                                                        ) : (
+                                                            <div className={`w-10 h-10 rounded-xl border flex items-center justify-center text-gray-500 ${isLight ? 'bg-slate-100 border-slate-200' : 'bg-white/5 border-white/10'}`}>
+                                                                <ImageIcon className="w-4 h-4 opacity-50" />
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                    <td className="py-3.5 px-3">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="font-mono font-bold text-[10px] px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-500">
+                                                                {item.id}
+                                                            </span>
+                                                            <span className={`font-bold text-xs sm:text-sm ${isLight ? 'text-slate-900' : 'text-white'}`}>{item.customer}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className={`py-3.5 px-3 max-w-[180px] truncate ${isLight ? 'text-slate-700' : 'text-gray-300'}`}>{item.item}</td>
+                                                    <td className={`py-3.5 px-3 text-right font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>{item.total.toLocaleString()} ฿</td>
+                                                    <td className="py-3.5 px-3 text-right font-bold text-emerald-500">{item.paid.toLocaleString()} ฿</td>
+                                                    <td className="py-3.5 px-3 text-right font-bold text-amber-500">{remaining.toLocaleString()} ฿</td>
+                                                    <td className="py-3.5 px-3 min-w-[100px]">
+                                                        <div className="flex flex-col items-center gap-1">
+                                                            <span className="text-[10px] font-bold text-gray-400">{percent}%</span>
+                                                            <div className={`w-full h-1.5 rounded-full overflow-hidden ${isLight ? 'bg-slate-200' : 'bg-white/10'}`}>
+                                                                <div 
+                                                                    className={`h-full rounded-full ${isDone ? 'bg-emerald-500' : 'bg-indigo-500'}`}
+                                                                    style={{ width: `${percent}%` }}
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="py-3.5 px-3 text-center">
+                                                        <a
+                                                            href={item.contact}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className={`inline-flex items-center justify-center gap-1.5 px-3 py-1.5 border rounded-xl transition-all font-bold text-xs ${
+                                                                isLight 
+                                                                    ? 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100' 
+                                                                    : 'bg-indigo-500/10 border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/20'
+                                                            }`}
+                                                            title={`ติดต่อ ${item.customer} ทาง ${item.contactType}`}
+                                                        >
+                                                            {item.contactType === 'Facebook' ? <Share2 className="w-3.5 h-3.5 text-blue-500" /> : <MessageCircle className="w-3.5 h-3.5 text-emerald-500" />}
+                                                            <span>ทัก{item.contactType || 'ลูกค้า'}</span>
+                                                        </a>
+                                                    </td>
+                                                    <td className="py-3.5 px-3 text-center">
+                                                        <div className="flex items-center justify-center gap-1.5">
+                                                            {!isDone && (
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setPaymentModalItem(item)
+                                                                        setPaymentInput('')
+                                                                    }}
+                                                                    className="px-2.5 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-500 font-bold text-[11px] flex items-center gap-1 transition-all cursor-pointer"
+                                                                    title="บันทึกค่างวด"
+                                                                >
+                                                                    <CreditCard className="w-3.5 h-3.5" />
+                                                                    <span>ค่างวด</span>
+                                                                </button>
+                                                            )}
+                                                            <button
+                                                                onClick={() => setDeleteModalData({ type: 'installment', id: item.id, title: item.customer })}
+                                                                className="p-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/20 cursor-pointer"
+                                                                title="ลบรายการผ่อนนี้ถาวร"
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            )
+                                        })
+                                ) : (
+                                    <tr>
+                                        <td colSpan={9} className="py-8 text-center text-gray-500">
+                                            ยังไม่มีรายการผ่อนชำระในบัญชีนี้
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </main>
+
+            {/* WELCOME POP-UP MODAL (เด้งต้อนรับหลังเข้าสู่ระบบ สามารถกากบาทปิดได้) */}
+            {showWelcomeModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in-up">
+                    <div className={`border w-full max-w-md rounded-3xl shadow-2xl p-6 sm:p-8 relative overflow-hidden text-center ${
+                        isLight ? 'bg-white border-indigo-200 text-slate-900' : 'bg-[#101222] border-indigo-500/30 text-white'
+                    }`}>
+                        {/* Close X Button */}
+                        <button 
+                            type="button" 
+                            onClick={() => setShowWelcomeModal(false)}
+                            className="absolute top-4 right-4 text-gray-400 hover:text-white p-1.5 rounded-xl bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
+
+                        {/* Animated Mascot / Party Icon */}
+                        <div className="relative w-24 h-24 mx-auto mb-4 flex items-center justify-center">
+                            <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-indigo-500/30 via-purple-500/30 to-pink-500/30 blur-xl animate-pulse"></div>
+                            <img 
+                                src="/cat.png" 
+                                alt="Nyan Cat Welcome" 
+                                className="w-full h-full object-contain animate-bounce drop-shadow-[0_8px_20px_rgba(236,72,153,0.5)] relative z-10" 
+                            />
+                        </div>
+
+                        <div className="space-y-2 mb-6">
+                            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold">
+                                <PartyPopper className="w-4 h-4 text-amber-400" />
+                                <span>เข้าสู่ระบบสำเร็จ</span>
+                            </div>
+                            <h3 className="text-xl sm:text-2xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">
+                                ยินดีต้อนรับคุณ {currentUser?.name}! 🎉
+                            </h3>
+                            <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600' : 'text-gray-400'}`}>
+                                เข้าสู่ระบบจัดการบันทึกกำไรขายออก และติดตามยอดผ่อนสินค้าของคุณเรียบร้อยแล้ว
+                            </p>
+                        </div>
+
+                        {/* Quick Tips Box */}
+                        <div className={`p-4 rounded-2xl border text-left text-xs space-y-2 mb-6 ${
+                            isLight ? 'bg-slate-50 border-slate-200' : 'bg-white/[0.03] border-white/10'
+                        }`}>
+                            <div className="flex items-center gap-2 text-emerald-400 font-bold">
+                                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-500" />
+                                <span>บันทึกกำไรขายออก + แนบรูปสินค้าได้</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-indigo-400 font-bold">
+                                <CheckCircle2 className="w-4 h-4 shrink-0 text-indigo-500" />
+                                <span>ติดตามยอดผ่อน & ทักหาลูกค้าใน 1 คลิก</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-purple-400 font-bold">
+                                <CheckCircle2 className="w-4 h-4 shrink-0 text-purple-500" />
+                                <span>พื้นที่ส่วนตัว ข้อมูลซิงก์อิสระ 100%</span>
+                            </div>
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={() => setShowWelcomeModal(false)}
+                            className="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:scale-[1.02] active:scale-[0.98] text-white font-bold text-sm shadow-lg shadow-indigo-600/30 transition-all cursor-pointer flex items-center justify-center gap-2"
+                        >
+                            <span>เริ่มใช้งานระบบเลย</span>
+                            <Rocket className="w-4 h-4" />
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL 1: ADD PROFIT LOG */}
+            {showAddProfitModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-fade-in-up">
+                    <div className={`border w-full max-w-lg rounded-3xl shadow-2xl p-5 sm:p-8 relative max-h-[90vh] overflow-y-auto ${
+                        isLight ? 'bg-white border-slate-200 text-slate-900' : 'bg-[#121424] border-white/10 text-white'
+                    }`}>
+                        <div className="flex justify-between items-center mb-5">
+                            <h3 className="text-lg sm:text-xl font-bold flex items-center gap-2">
+                                <Plus className="w-5 h-5 text-emerald-500" />
+                                บันทึกกำไรสินค้าขายออก
+                            </h3>
+                            <button onClick={() => setShowAddProfitModal(false)} className="text-gray-400 hover:text-gray-600 p-1 cursor-pointer">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleAddProfit} className="space-y-4 text-xs">
+                            <div>
+                                <label className="block font-semibold mb-1">ชื่อรายการสินค้าที่ขาย *</label>
+                                <input
+                                    type="text"
+                                    value={profitTitle}
+                                    onChange={(e) => setProfitTitle(e.target.value)}
+                                    placeholder="เช่น ขายไอดี RoV แรงค์ Conqueror"
+                                    className={`w-full border rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
+                                        isLight ? 'bg-slate-50 border-slate-200 text-slate-900' : 'bg-white/5 border-white/10 text-white'
+                                    }`}
+                                    required
+                                />
+                            </div>
+
+                            {/* แนบรูปภาพสินค้า/สลิป */}
+                            <div>
+                                <label className="block font-semibold mb-1 flex items-center justify-between">
+                                    <span>แนบรูปภาพสินค้า / สลิปโอนเงิน</span>
+                                    <span className="text-[10px] text-gray-400 font-normal">เลือกไฟล์จากอุปกรณ์</span>
+                                </label>
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={(e) => handleImageUpload(e, setProfitImage)}
+                                        className="hidden"
+                                        id="profit-img-upload"
+                                    />
+                                    <label
+                                        htmlFor="profit-img-upload"
+                                        className={`flex-1 flex items-center justify-center gap-2 border border-dashed rounded-xl p-3 cursor-pointer transition-colors ${
+                                            isLight ? 'bg-slate-50 border-slate-300 hover:bg-slate-100' : 'bg-white/5 border-white/20 hover:bg-white/10'
+                                        }`}
+                                    >
+                                        <Upload className="w-4 h-4 text-emerald-500" />
+                                        <span className="font-semibold">{profitImage ? '📸 เปลี่ยนรูปภาพแล้ว' : '📁 เลือกไฟล์รูปภาพ...'}</span>
+                                    </label>
+                                    {profitImage && (
+                                        <div className="w-12 h-12 rounded-xl overflow-hidden border border-emerald-500 relative shrink-0">
+                                            <img src={profitImage} alt="Preview" className="w-full h-full object-cover" />
+                                            <button 
+                                                type="button" 
+                                                onClick={() => setProfitImage('')}
+                                                className="absolute top-0 right-0 bg-rose-500 text-white w-4 h-4 flex items-center justify-center text-[9px] rounded-bl"
+                                            >
+                                                ✕
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* ราคารับ vs ราคาขายออก */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block font-semibold mb-1">ราคารับ / ต้นทุน (บาท)</label>
+                                    <input
+                                        type="number"
+                                        value={profitCost}
+                                        onChange={(e) => setProfitCost(e.target.value)}
+                                        placeholder="2000"
+                                        className={`w-full border rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
+                                            isLight ? 'bg-slate-50 border-slate-200 text-slate-900' : 'bg-white/5 border-white/10 text-white'
+                                        }`}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block font-semibold mb-1">ราคาขายออก (บาท) *</label>
+                                    <input
+                                        type="number"
+                                        value={profitPrice}
+                                        onChange={(e) => setProfitPrice(e.target.value)}
+                                        placeholder="3500"
+                                        className={`w-full border rounded-xl p-3 font-bold text-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
+                                            isLight ? 'bg-slate-50 border-slate-200' : 'bg-white/5 border-white/10'
+                                        }`}
+                                        required
+                                    />
+                                </div>
+                            </div>
+
+                            {/* คำนวณกำไรอัตโนมัติ */}
+                            <div className={`p-3.5 rounded-xl border flex items-center justify-between ${
+                                isLight ? 'bg-emerald-50 border-emerald-200' : 'bg-emerald-500/10 border-emerald-500/30'
+                            }`}>
+                                <div className="flex items-center gap-2">
+                                    <Calculator className="w-4 h-4 text-emerald-500" />
+                                    <span className={`font-semibold ${isLight ? 'text-emerald-800' : 'text-emerald-300'}`}>คำนวณกำไรสุทธอัตโนมัติ:</span>
+                                </div>
+                                <span className="text-base sm:text-lg font-black text-emerald-500">
+                                    +{calculatedProfitPreview.toLocaleString()} ฿
+                                </span>
+                            </div>
+
+                            {/* วันที่ขาย & หมวดหมู่ */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block font-semibold mb-1">วันที่ขาย *</label>
+                                    <input
+                                        type="date"
+                                        value={profitDate}
+                                        onChange={(e) => setProfitDate(e.target.value)}
+                                        className={`w-full border rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-bold ${
+                                            isLight ? 'bg-slate-50 border-slate-200 text-slate-900' : 'bg-[#181a2e] border-white/10 text-white'
+                                        }`}
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block font-semibold mb-1">หมวดหมู่สินค้า *</label>
+                                    <select
+                                        value={profitCategory}
+                                        onChange={(e) => setProfitCategory(e.target.value)}
+                                        className={`w-full border rounded-xl p-3 font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
+                                            isLight ? 'bg-slate-50 border-slate-200 text-indigo-700' : 'bg-[#181a2e] border-white/10 text-indigo-300'
+                                        }`}
+                                    >
+                                        <option value="ขายไอดี">ขายไอดี</option>
+                                        <option value="เติมเกม">เติมเกม</option>
+                                        <option value="ปล่อยเช่า">ปล่อยเช่า</option>
+                                        <option value="อื่นๆ">อื่นๆ</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block font-semibold mb-1">หมายเหตุเพิ่มเติม</label>
+                                <input
+                                    type="text"
+                                    value={profitNote}
+                                    onChange={(e) => setProfitNote(e.target.value)}
+                                    placeholder="เช่น ลูกค้าโอนผ่าน พร้อมเพย์ / ส่งมอบรหัสแล้ว"
+                                    className={`w-full border rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
+                                        isLight ? 'bg-slate-50 border-slate-200 text-slate-900' : 'bg-white/5 border-white/10 text-white'
+                                    }`}
+                                />
+                            </div>
+
+                            <button
+                                type="submit"
+                                className="w-full py-3.5 mt-2 bg-gradient-to-r from-emerald-600 to-teal-600 rounded-xl font-bold text-white shadow-lg shadow-emerald-600/30 hover:scale-[1.01] active:scale-[0.98] transition-all text-xs sm:text-sm cursor-pointer"
+                            >
+                                ยืนยันบันทึกกำไรลงระบบ
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL 2: ADD INSTALLMENT */}
+            {showAddInstallmentModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-fade-in-up">
+                    <div className={`border w-full max-w-lg rounded-3xl shadow-2xl p-5 sm:p-8 relative max-h-[90vh] overflow-y-auto ${
+                        isLight ? 'bg-white border-slate-200 text-slate-900' : 'bg-[#121424] border-white/10 text-white'
+                    }`}>
+                        <div className="flex justify-between items-center mb-5">
+                            <h3 className="text-lg sm:text-xl font-bold flex items-center gap-2">
+                                <Plus className="w-5 h-5 text-indigo-500" />
+                                เพิ่มสัญญาผ่อนสินค้าใหม่
+                            </h3>
+                            <button onClick={() => setShowAddInstallmentModal(false)} className="text-gray-400 hover:text-gray-600 p-1 cursor-pointer">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleAddInstallment} className="space-y-4 text-xs">
+                            <div>
+                                <label className="block font-semibold mb-1">ชื่อลูกค้า *</label>
+                                <input
+                                    type="text"
+                                    value={instCustomer}
+                                    onChange={(e) => setInstCustomer(e.target.value)}
+                                    placeholder="เช่น คุณสมศักดิ์"
+                                    className={`w-full border rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                                        isLight ? 'bg-slate-50 border-slate-200 text-slate-900' : 'bg-white/5 border-white/10 text-white'
+                                    }`}
+                                    required
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block font-semibold mb-1">สินค้าที่ผ่อน *</label>
+                                <input
+                                    type="text"
+                                    value={instItem}
+                                    onChange={(e) => setInstItem(e.target.value)}
+                                    placeholder="เช่น ไอดีเกม Valorant สกิน 20+"
+                                    className={`w-full border rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                                        isLight ? 'bg-slate-50 border-slate-200 text-slate-900' : 'bg-white/5 border-white/10 text-white'
+                                    }`}
+                                    required
+                                />
+                            </div>
+
+                            {/* แนบรูปภาพสินค้า/สัญญาผ่อน */}
+                            <div>
+                                <label className="block font-semibold mb-1 flex items-center justify-between">
+                                    <span>แนบรูปภาพสินค้า / สัญญาผ่อน</span>
+                                    <span className="text-[10px] text-gray-400 font-normal">เลือกไฟล์จากอุปกรณ์</span>
+                                </label>
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={(e) => handleImageUpload(e, setInstImage)}
+                                        className="hidden"
+                                        id="inst-img-upload"
+                                    />
+                                    <label
+                                        htmlFor="inst-img-upload"
+                                        className={`flex-1 flex items-center justify-center gap-2 border border-dashed rounded-xl p-3 cursor-pointer transition-colors ${
+                                            isLight ? 'bg-slate-50 border-slate-300 hover:bg-slate-100' : 'bg-white/5 border-white/20 hover:bg-white/10'
+                                        }`}
+                                    >
+                                        <Upload className="w-4 h-4 text-indigo-500" />
+                                        <span className="font-semibold">{instImage ? '📸 เปลี่ยนรูปภาพแล้ว' : '📁 เลือกไฟล์รูปภาพ...'}</span>
+                                    </label>
+                                    {instImage && (
+                                        <div className="w-12 h-12 rounded-xl overflow-hidden border border-indigo-500 relative shrink-0">
+                                            <img src={instImage} alt="Preview" className="w-full h-full object-cover" />
+                                            <button 
+                                                type="button" 
+                                                onClick={() => setInstImage('')}
+                                                className="absolute top-0 right-0 bg-rose-500 text-white w-4 h-4 flex items-center justify-center text-[9px] rounded-bl"
+                                            >
+                                                ✕
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block font-semibold mb-1">ราคาเต็มสินค้า (บาท) *</label>
+                                    <input
+                                        type="number"
+                                        value={instTotal}
+                                        onChange={(e) => setInstTotal(e.target.value)}
+                                        placeholder="5000"
+                                        className={`w-full border rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                                            isLight ? 'bg-slate-50 border-slate-200 text-slate-900' : 'bg-white/5 border-white/10 text-white'
+                                        }`}
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block font-semibold mb-1">เงินดาวน์/ชำระแล้ว (บาท)</label>
+                                    <input
+                                        type="number"
+                                        value={instPaid}
+                                        onChange={(e) => setInstPaid(e.target.value)}
+                                        placeholder="1500"
+                                        className={`w-full border rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                                            isLight ? 'bg-slate-50 border-slate-200 text-slate-900' : 'bg-white/5 border-white/10 text-white'
+                                        }`}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block font-semibold mb-1">ลิงก์ติดต่อลูกค้า *</label>
+                                    <input
+                                        type="text"
+                                        value={instContact}
+                                        onChange={(e) => setInstContact(e.target.value)}
+                                        placeholder="https://lin.ee/..."
+                                        className={`w-full border rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                                            isLight ? 'bg-slate-50 border-slate-200 text-slate-900' : 'bg-white/5 border-white/10 text-white'
+                                        }`}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block font-semibold mb-1">ประเภทช่องทาง</label>
+                                    <select
+                                        value={instContactType}
+                                        onChange={(e) => setInstContactType(e.target.value)}
+                                        className={`w-full border rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                                            isLight ? 'bg-slate-50 border-slate-200 text-slate-900' : 'bg-[#181a2e] border-white/10 text-white'
+                                        }`}
+                                    >
+                                        <option value="Line">Line Official</option>
+                                        <option value="Facebook">Facebook</option>
+                                        <option value="Phone">เบอร์โทรศัพท์</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <button
+                                type="submit"
+                                className="w-full py-3.5 mt-2 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl font-bold text-white shadow-lg shadow-indigo-600/30 hover:scale-[1.01] active:scale-[0.98] transition-all text-xs sm:text-sm cursor-pointer"
+                            >
+                                สร้างสัญญาผ่อนชำระลงระบบ
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL 3: RECORD PAYMENT */}
+            {paymentModalItem && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-fade-in-up">
+                    <div className={`border w-full max-w-md rounded-3xl shadow-2xl p-5 sm:p-6 relative ${
+                        isLight ? 'bg-white border-slate-200 text-slate-900' : 'bg-[#121424] border-white/10 text-white'
+                    }`}>
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-base sm:text-lg font-bold flex items-center gap-2">
+                                <CreditCard className="w-5 h-5 text-emerald-500" />
+                                บันทึกค่างวดผ่อนชำระ
+                            </h3>
+                            <button onClick={() => setPaymentModalItem(null)} className="text-gray-400 hover:text-gray-600 p-1 cursor-pointer">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <div className={`p-3.5 rounded-xl mb-4 text-xs space-y-1 border ${
+                            isLight ? 'bg-slate-50 border-slate-200' : 'bg-white/5 border-white/5'
+                        }`}>
+                            <div>ลูกค้า: <span className="font-bold">{paymentModalItem.customer}</span></div>
+                            <div>ชำระแล้ว: <span className="font-bold text-emerald-500">{paymentModalItem.paid.toLocaleString()} ฿</span> / {paymentModalItem.total.toLocaleString()} ฿</div>
+                            <div>ยอดคงเหลือ: <span className="font-bold text-rose-500">{(paymentModalItem.total - paymentModalItem.paid).toLocaleString()} ฿</span></div>
+                        </div>
+                        <form onSubmit={handleRecordPayment} className="space-y-4 text-xs">
+                            <div>
+                                <label className="block font-semibold mb-1">จำนวนเงินค่างวดเพิ่ม (บาท) *</label>
+                                <input
+                                    type="number"
+                                    value={paymentInput}
+                                    onChange={(e) => setPaymentInput(e.target.value)}
+                                    placeholder="500"
+                                    className={`w-full border rounded-xl p-3 font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
+                                        isLight ? 'bg-slate-50 border-slate-200 text-slate-900' : 'bg-white/5 border-white/10 text-white'
+                                    }`}
+                                    required
+                                    autoFocus
+                                />
+                            </div>
+                            <button
+                                type="submit"
+                                className="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-600 rounded-xl font-bold text-white shadow-lg transition-all text-xs sm:text-sm cursor-pointer"
+                            >
+                                ยืนยันชำระค่างวด
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL 4: FULLSCREEN LIGHTBOX IMAGE PREVIEW */}
+            {lightboxImage && (
+                <div 
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-fade-in-up cursor-pointer"
+                    onClick={() => setLightboxImage(null)}
+                >
+                    <div className="relative max-w-4xl max-h-[90vh] overflow-hidden rounded-2xl shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                        <button 
+                            onClick={() => setLightboxImage(null)} 
+                            className="absolute top-3 right-3 bg-black/70 text-white hover:bg-rose-600 p-2 rounded-full transition-colors z-10"
+                        >
+                            <X className="w-6 h-6" />
+                        </button>
+                        <img src={lightboxImage} alt="Full Image Preview" className="w-full h-full object-contain max-h-[85vh] rounded-2xl" />
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL 5: CONFIRM DELETE MODAL */}
+            {deleteModalData && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-fade-in-up">
+                    <div className={`border w-full max-w-md rounded-3xl shadow-2xl p-6 sm:p-8 relative text-center overflow-hidden ${
+                        isLight ? 'bg-white border-rose-300 text-slate-900' : 'bg-[#141628] border-rose-500/30 text-white'
+                    }`}>
+                        <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-500 flex items-center justify-center mx-auto mb-4 animate-bounce">
+                            <AlertTriangle className="w-7 h-7 sm:w-8 sm:h-8" />
+                        </div>
+
+                        <h3 className="text-lg sm:text-xl font-black mb-2">
+                            ยืนยันการลบข้อมูลถาวร?
+                        </h3>
+
+                        <p className="text-xs text-gray-400 mb-6 leading-relaxed">
+                            คุณแน่ใจหรือไม่ว่าต้องการลบรายการ <br />
+                            <strong className="text-rose-500 font-bold text-sm">"{deleteModalData.title}"</strong> ? <br />
+                            <span className="text-gray-500 text-[11px] mt-1 block">รายการนี้จะถูกลบออกจากบัญชีของคุณถาวร</span>
+                        </p>
+
+                        <div className="flex items-center gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setDeleteModalData(null)}
+                                className={`flex-1 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+                                    isLight ? 'bg-slate-100 hover:bg-slate-200 text-slate-700' : 'bg-white/10 hover:bg-white/20 text-gray-300'
+                                }`}
+                            >
+                                ยกเลิก
+                            </button>
+                            <button
+                                type="button"
+                                onClick={confirmDeleteAction}
+                                className="flex-1 py-3 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-bold text-xs shadow-lg shadow-rose-600/30 transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                                <span>ยืนยันลบรายการ</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
-  );
+    )
 }
