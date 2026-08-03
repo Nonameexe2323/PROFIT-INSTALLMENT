@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { 
     Lock, User, Eye, EyeOff, ArrowRight, Wallet, UserPlus, LogIn, CheckCircle2, 
     Shield, Sparkles, Sun, Moon, TrendingUp, DollarSign, Clock, MessageCircle,
-    Zap, Award, BarChart3, Star, ShieldCheck, Flame
+    Zap, Award, BarChart3, Star, ShieldCheck, Flame, Key
 } from 'lucide-react'
 import { loginUserAccount, registerNewUser } from '@/utils/supabaseClient'
 
@@ -18,11 +18,12 @@ export default function LoginPage() {
     const [loginIdentifier, setLoginIdentifier] = useState('')
     const [loginPassword, setLoginPassword] = useState('')
 
-    // Register State
+    // Register State (รวมรหัสเชิญสมัครจากเจ้าของเว็บ)
     const [regName, setRegName] = useState('')
     const [regEmail, setRegEmail] = useState('')
     const [regPassword, setRegPassword] = useState('')
     const [regConfirmPassword, setRegConfirmPassword] = useState('')
+    const [regInviteCode, setRegInviteCode] = useState('')
 
     // Feedback State
     const [isLoading, setIsLoading] = useState(false)
@@ -66,11 +67,15 @@ export default function LoginPage() {
         }, 150)
     }
 
-    // Register Handler
+    // Register Handler (พร้อมตรวจสอบรหัสเชิญจากเจ้าของเว็บ)
     const handleRegisterSubmit = (e) => {
         e.preventDefault()
         if (!regName || !regEmail || !regPassword) {
             setErrorMsg('กรุณากรอกข้อมูลให้ครบถ้วนทุกช่อง')
+            return
+        }
+        if (!regInviteCode) {
+            setErrorMsg('คุณต้องมีรหัสสมัครจากเจ้าของเว็บ (sakchawit)')
             return
         }
         if (regPassword.length < 6) {
@@ -87,7 +92,7 @@ export default function LoginPage() {
         setSuccessMsg('')
 
         setTimeout(() => {
-            const res = registerNewUser(regName, regEmail, regPassword)
+            const res = registerNewUser(regName, regEmail, regPassword, regInviteCode)
             setIsLoading(false)
             if (res.success) {
                 if (typeof window !== 'undefined') {
@@ -96,7 +101,7 @@ export default function LoginPage() {
                 setSuccessMsg(`🎉 สมัครสมาชิกสำเร็จ! สร้างบัญชีใหม่สำหรับคุณ ${res.user.name} เรียบร้อย`)
                 setTimeout(() => router.push('/'), 400)
             } else {
-                setErrorMsg(res.error || 'เกิดข้อผิดพลาดในการสมัครสมาชิก')
+                setErrorMsg(res.error || 'คุณต้องมีรหัสสมัครจากเจ้าของเว็บ (sakchawit)')
             }
         }, 150)
     }
@@ -139,7 +144,7 @@ export default function LoginPage() {
             {/* Main Rich Container (Split Layout on Desktop & Stacked on Mobile/Tablet) */}
             <div className="w-full max-w-5xl z-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center py-6">
                 
-                {/* LEFT HERO SHOWCASE SECTION - ALWAYS VISIBLE */}
+                {/* LEFT HERO SHOWCASE SECTION */}
                 <div className="lg:col-span-6 space-y-5 animate-fade-in-up pr-0 lg:pr-4">
                     <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-gradient-to-r from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 text-indigo-300 text-xs font-bold shadow-lg">
                         <Flame className="w-4 h-4 text-amber-400 animate-bounce" />
@@ -367,8 +372,31 @@ export default function LoginPage() {
                                     </button>
                                 </form>
                             ) : (
-                                /* MODE 2: REGISTER FORM */
+                                /* MODE 2: REGISTER FORM (รวมรหัสสมัครจากเจ้าของเว็บ) */
                                 <form onSubmit={handleRegisterSubmit} className="space-y-4">
+                                    {/* รหัสอนุมัติสมัครจากเจ้าของเว็บ */}
+                                    <div>
+                                        <label className={`block text-xs font-semibold mb-1.5 tracking-wide flex items-center justify-between ${isLight ? 'text-slate-700' : 'text-gray-300'}`}>
+                                            <span>รหัสสมัครสมาชิกจากเจ้าของเว็บ *</span>
+                                            <span className="text-[10px] text-amber-400 font-bold">ต้องมีรหัสอนุมัติ</span>
+                                        </label>
+                                        <div className="relative">
+                                            <Key className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-400" />
+                                            <input
+                                                type="text"
+                                                value={regInviteCode}
+                                                onChange={(e) => setRegInviteCode(e.target.value)}
+                                                className={`w-full rounded-xl py-3 pl-11 pr-4 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-amber-500 font-bold ${
+                                                    isLight 
+                                                        ? 'bg-slate-50 border border-amber-300 text-slate-900 placeholder-slate-400' 
+                                                        : 'bg-white/[0.04] border border-amber-500/40 text-amber-300 placeholder-gray-500'
+                                                }`}
+                                                placeholder="ใส่รหัสสมัคร เช่น sakchawit"
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+
                                     <div>
                                         <label className={`block text-xs font-semibold mb-1.5 tracking-wide ${isLight ? 'text-slate-700' : 'text-gray-300'}`}>
                                             ชื่อผู้ใช้งาน / ชื่อร้านค้า *
@@ -468,7 +496,7 @@ export default function LoginPage() {
                                         {isLoading ? (
                                             <div className="flex items-center gap-2">
                                                 <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                                                <span>กำลังสร้างบัญชี...</span>
+                                                <span>กำลังตรวจสอบและสมัคร...</span>
                                             </div>
                                         ) : (
                                             <>

@@ -21,7 +21,7 @@ export const DEFAULT_PROFIT_LOGS = [
     {
         id: 'PR001',
         title: 'ขายไอดี RoV - Rank Conqueror (สกิน 120+)',
-        category: 'ขายสด',
+        category: 'ขายไอดี',
         cost: 2000,
         price: 3500,
         profit: 1500,
@@ -32,7 +32,7 @@ export const DEFAULT_PROFIT_LOGS = [
     {
         id: 'PR002',
         title: 'ขายไอดี Valorant - Prime Vandal + Kuronami',
-        category: 'ผ่อนงวดแรก',
+        category: 'ขายไอดี',
         cost: 3000,
         price: 5000,
         profit: 2000,
@@ -118,10 +118,20 @@ export function logoutUserSession() {
     }
 }
 
-export function registerNewUser(name, email, password) {
+export function registerNewUser(name, email, password, inviteCode) {
     const users = getUsersFromStorage()
     const trimmedName = name.trim()
     const trimmedEmail = email.trim().toLowerCase()
+    const trimmedCode = (inviteCode || '').trim().toLowerCase()
+
+    // Validate Owner Invite Code (sakchawit / sakchawit2026 / admin)
+    const validCodes = ['sakchawit', 'sakchawit2026', 'sakchawit123', 'admin', 'sakchawitshop']
+    if (!trimmedCode || !validCodes.includes(trimmedCode)) {
+        return { 
+            success: false, 
+            error: 'คุณต้องมีรหัสสมัครจากเจ้าของเว็บ (sakchawit)' 
+        }
+    }
 
     // Check existing name or email
     const existing = users.find(u => 
@@ -245,13 +255,14 @@ export async function getProfitsFromSupabase(userId) {
             id: item.code || item.id,
             dbId: item.id,
             title: item.title,
-            category: item.category || 'ขายสด',
+            category: item.category || 'ขายไอดี',
             cost: Number(item.cost || 0),
             price: Number(item.price || 0),
             profit: Number(item.profit || 0),
             date: item.date || item.created_at?.split('T')[0],
             month: item.month || 'ส.ค.',
-            note: item.note || ''
+            note: item.note || '',
+            image: item.image || ''
         }))
 
         return { data: formatted, isDatabase: true }
@@ -273,7 +284,8 @@ export async function saveProfitToSupabase(record, userId) {
                 profit: record.profit,
                 date: record.date,
                 month: record.month,
-                note: record.note
+                note: record.note,
+                image: record.image || ''
             }])
         return { success: !error }
     } catch {
@@ -316,7 +328,8 @@ export async function getInstallmentsFromSupabase(userId) {
             nextDue: item.next_due || 'ชำระครบแล้ว',
             contact: item.contact || '#',
             contactType: item.contact_type || 'Line',
-            status: item.status || 'active'
+            status: item.status || 'active',
+            image: item.image || ''
         }))
         return { data: formatted, isDatabase: true }
     } catch {
@@ -338,7 +351,8 @@ export async function saveInstallmentToSupabase(record, userId) {
                 next_due: record.nextDue,
                 contact: record.contact,
                 contact_type: record.contactType || 'Line',
-                status: record.status
+                status: record.status,
+                image: record.image || ''
             }])
         return { success: !error }
     } catch {
