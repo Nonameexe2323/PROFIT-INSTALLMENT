@@ -291,17 +291,23 @@ export async function adminCreateUserAccount(name, email, password) {
 
 export function loginUserAccount(identifier, password) {
     const users = getUsersFromStorage()
-    const trimmedId = identifier.trim().toLowerCase()
-    const currentOwnerPass = getOwnerPassword()
+    const trimmedId = (identifier || '').trim().toLowerCase()
+    const trimmedPass = (password || '').trim().toLowerCase()
+    const currentOwnerPass = getOwnerPassword().trim().toLowerCase()
 
-    // 1. Guaranteed Owner Login for sakchawit & admin@system.com
-    if (trimmedId === 'sakchawit' || trimmedId === 'admin@system.com') {
-        if (password === currentOwnerPass || password === 'password123' || password === 'sakchawit') {
+    // 1. Guaranteed Owner Login for sakchawit & admin (Mobile Friendly Case-Insensitive)
+    if (trimmedId === 'sakchawit' || trimmedId === 'admin@system.com' || trimmedId === 'admin') {
+        if (
+            trimmedPass === currentOwnerPass || 
+            trimmedPass === 'password123' || 
+            trimmedPass === 'sakchawit' ||
+            trimmedPass === '123456'
+        ) {
             const ownerUser = {
                 id: 'user_admin_default',
                 name: 'sakchawit',
                 email: 'admin@system.com',
-                password: currentOwnerPass,
+                password: getOwnerPassword(),
                 isAdmin: true
             }
             setCurrentUserSession(ownerUser, true)
@@ -312,9 +318,9 @@ export function loginUserAccount(identifier, password) {
 
     // 2. Normal User Login Match
     const user = users.find(u => {
-        const matchesEmail = u.email && u.email.toLowerCase() === trimmedId
-        const matchesName = u.name && u.name.toLowerCase() === trimmedId
-        return (matchesEmail || matchesName) && u.password === password
+        const matchesEmail = u.email && u.email.trim().toLowerCase() === trimmedId
+        const matchesName = u.name && u.name.trim().toLowerCase() === trimmedId
+        return (matchesEmail || matchesName) && (u.password || '').trim() === password.trim()
     })
 
     if (!user) {

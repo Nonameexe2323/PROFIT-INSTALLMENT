@@ -62,12 +62,12 @@ export default function LoginPage() {
                 setSuccessMsg(`🎉 เข้าสู่ระบบสำเร็จ ยินดีต้อนรับคุณ ${res.user.name}`)
                 setTimeout(() => router.push('/'), 300)
             } else {
-                setErrorMsg('⚠️ ชื่อผู้ใช้/อีเมล หรือรหัสผ่านไม่ถูกต้อง')
+                setErrorMsg('⚠️ ชื่อผู้ใช้/อีเมล หรือรหัสผ่านไม่ถูกต้อง (ลองตรวจสอบตัวพิมพ์เล็ก/ใหญ่)')
             }
         }, 150)
     }
 
-    // Register Handler (พร้อมระบบแจ้งเตือน Custom สวยงาม และ Await ซิงก์ไป Supabase 100%)
+    // Register Handler
     const handleRegisterSubmit = async (e) => {
         e.preventDefault()
         if (!regInviteCode.trim()) {
@@ -139,7 +139,7 @@ export default function LoginPage() {
                 </button>
             </div>
 
-            {/* Main Rich Container (Split Layout on Desktop & Stacked on Mobile/Tablet) */}
+            {/* Main Rich Container */}
             <div className="w-full max-w-5xl z-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center py-6">
                 
                 {/* LEFT HERO SHOWCASE SECTION */}
@@ -285,7 +285,7 @@ export default function LoginPage() {
                                 </button>
                             </div>
 
-                            {/* CUSTOM BEAUTIFUL ALERT POPUP BANNERS (แทนที่ Browser Native Popups) */}
+                            {/* CUSTOM BEAUTIFUL ALERT POPUP BANNERS */}
                             {errorMsg && (
                                 <div className="mb-4 p-4 rounded-2xl bg-gradient-to-r from-rose-500/20 to-red-500/20 border border-rose-500/40 text-rose-300 text-xs font-bold flex items-start justify-between gap-3 shadow-lg animate-fade-in-up backdrop-blur-md">
                                     <div className="flex items-start gap-2.5">
@@ -317,7 +317,7 @@ export default function LoginPage() {
                                 </div>
                             )}
 
-                            {/* MODE 1: LOGIN FORM */}
+                            {/* MODE 1: LOGIN FORM (Mobile Optimized Auto-Capitalize Disabled) */}
                             {mode === 'login' ? (
                                 <form onSubmit={handleLoginSubmit} noValidate className="space-y-4">
                                     <div>
@@ -330,6 +330,9 @@ export default function LoginPage() {
                                                 type="text"
                                                 value={loginIdentifier}
                                                 onChange={(e) => setLoginIdentifier(e.target.value)}
+                                                autoCapitalize="none"
+                                                autoCorrect="off"
+                                                spellCheck={false}
                                                 className={`w-full rounded-xl py-3 pl-11 pr-4 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
                                                     isLight 
                                                         ? 'bg-slate-50 border border-slate-200 text-slate-900 placeholder-slate-400' 
@@ -350,6 +353,9 @@ export default function LoginPage() {
                                                 type={showPassword ? 'text' : 'password'}
                                                 value={loginPassword}
                                                 onChange={(e) => setLoginPassword(e.target.value)}
+                                                autoCapitalize="none"
+                                                autoCorrect="off"
+                                                spellCheck={false}
                                                 className={`w-full rounded-xl py-3 pl-11 pr-11 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
                                                     isLight 
                                                         ? 'bg-slate-50 border border-slate-200 text-slate-900 placeholder-slate-400' 
@@ -386,9 +392,8 @@ export default function LoginPage() {
                                     </button>
                                 </form>
                             ) : (
-                                /* MODE 2: REGISTER FORM (ไม่ใช้ Browser Native Validation Popup) */
+                                /* MODE 2: REGISTER FORM */
                                 <form onSubmit={handleRegisterSubmit} noValidate className="space-y-4">
-                                    {/* รหัสอนุมัติสมัครจากเจ้าของเว็บ */}
                                     <div>
                                         <label className={`block text-xs font-semibold mb-1.5 tracking-wide flex items-center justify-between ${isLight ? 'text-slate-700' : 'text-gray-300'}`}>
                                             <span>รหัสสมัครสมาชิกจากเจ้าของเว็บ *</span>
@@ -400,6 +405,9 @@ export default function LoginPage() {
                                                 type="text"
                                                 value={regInviteCode}
                                                 onChange={(e) => setRegInviteCode(e.target.value)}
+                                                autoCapitalize="none"
+                                                autoCorrect="off"
+                                                spellCheck={false}
                                                 className={`w-full rounded-xl py-3 pl-11 pr-4 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-amber-500 font-bold ${
                                                     isLight 
                                                         ? 'bg-slate-50 border border-amber-300 text-slate-900 placeholder-slate-400' 
@@ -420,6 +428,9 @@ export default function LoginPage() {
                                                 type="text"
                                                 value={regName}
                                                 onChange={(e) => setRegName(e.target.value)}
+                                                autoCapitalize="none"
+                                                autoCorrect="off"
+                                                spellCheck={false}
                                                 className={`w-full rounded-xl py-3 pl-11 pr-4 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
                                                     isLight 
                                                         ? 'bg-slate-50 border border-slate-200 text-slate-900 placeholder-slate-400' 
@@ -440,6 +451,9 @@ export default function LoginPage() {
                                                 type="email"
                                                 value={regEmail}
                                                 onChange={(e) => setRegEmail(e.target.value)}
+                                                autoCapitalize="none"
+                                                autoCorrect="off"
+                                                spellCheck={false}
                                                 className={`w-full rounded-xl py-3 pl-11 pr-4 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
                                                     isLight 
                                                         ? 'bg-slate-50 border border-slate-200 text-slate-900 placeholder-slate-400' 
@@ -460,6 +474,9 @@ export default function LoginPage() {
                                                 type={showPassword ? 'text' : 'password'}
                                                 value={regPassword}
                                                 onChange={(e) => setRegPassword(e.target.value)}
+                                                autoCapitalize="none"
+                                                autoCorrect="off"
+                                                spellCheck={false}
                                                 className={`w-full rounded-xl py-3 pl-11 pr-11 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
                                                     isLight 
                                                         ? 'bg-slate-50 border border-slate-200 text-slate-900 placeholder-slate-400' 
@@ -487,6 +504,9 @@ export default function LoginPage() {
                                                 type={showPassword ? 'text' : 'password'}
                                                 value={regConfirmPassword}
                                                 onChange={(e) => setRegConfirmPassword(e.target.value)}
+                                                autoCapitalize="none"
+                                                autoCorrect="off"
+                                                spellCheck={false}
                                                 className={`w-full rounded-xl py-3 pl-11 pr-11 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
                                                     isLight 
                                                         ? 'bg-slate-50 border border-slate-200 text-slate-900 placeholder-slate-400' 
