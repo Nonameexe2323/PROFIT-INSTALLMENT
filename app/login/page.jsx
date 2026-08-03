@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { 
     Lock, User, Eye, EyeOff, ArrowRight, Wallet, UserPlus, LogIn, CheckCircle2, 
     Shield, Sparkles, Sun, Moon, TrendingUp, DollarSign, Clock, MessageCircle,
-    Zap, Award, BarChart3, Star, ShieldCheck, Flame, Key
+    Zap, Award, BarChart3, Star, ShieldCheck, Flame, Key, AlertTriangle, X
 } from 'lucide-react'
 import { loginUserAccount, registerNewUser } from '@/utils/supabaseClient'
 
@@ -44,8 +44,8 @@ export default function LoginPage() {
     // Login Handler
     const handleLoginSubmit = (e) => {
         e.preventDefault()
-        if (!loginIdentifier || !loginPassword) {
-            setErrorMsg('กรุณากรอกชื่อผู้ใช้/อีเมล และรหัสผ่านให้ครบถ้วน')
+        if (!loginIdentifier.trim() || !loginPassword) {
+            setErrorMsg('⚠️ กรุณากรอกชื่อผู้ใช้/อีเมล และรหัสผ่านให้ครบถ้วน')
             return
         }
         setIsLoading(true)
@@ -59,31 +59,31 @@ export default function LoginPage() {
                 if (typeof window !== 'undefined') {
                     sessionStorage.setItem('just_logged_in', 'true')
                 }
-                setSuccessMsg(`เข้าสู่ระบบสำเร็จ ยินดีต้อนรับคุณ ${res.user.name}`)
+                setSuccessMsg(`🎉 เข้าสู่ระบบสำเร็จ ยินดีต้อนรับคุณ ${res.user.name}`)
                 setTimeout(() => router.push('/'), 300)
             } else {
-                setErrorMsg(res.error || 'ชื่อผู้ใช้/อีเมล หรือรหัสผ่านไม่ถูกต้อง')
+                setErrorMsg('⚠️ ชื่อผู้ใช้/อีเมล หรือรหัสผ่านไม่ถูกต้อง')
             }
         }, 150)
     }
 
-    // Register Handler (พร้อมตรวจสอบรหัสเชิญจากเจ้าของเว็บ)
+    // Register Handler (พร้อมระบบแจ้งเตือน Custom สวยงาม ไม่ใช้ Browser Default)
     const handleRegisterSubmit = (e) => {
         e.preventDefault()
-        if (!regName || !regEmail || !regPassword) {
-            setErrorMsg('กรุณากรอกข้อมูลให้ครบถ้วนทุกช่อง')
+        if (!regInviteCode.trim()) {
+            setErrorMsg('⚠️ กรุณากรอกรหัสอนุมัติสมัครสมาชิกจากเจ้าของเว็บ (sakchawit)')
             return
         }
-        if (!regInviteCode) {
-            setErrorMsg('คุณต้องมีรหัสสมัครจากเจ้าของเว็บ (sakchawit)')
+        if (!regName.trim() || !regEmail.trim() || !regPassword) {
+            setErrorMsg('⚠️ กรุณากรอกชื่อผู้ใช้ อีเมล และตั้งรหัสผ่านให้ครบถ้วนทุกช่อง')
             return
         }
         if (regPassword.length < 6) {
-            setErrorMsg('รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร')
+            setErrorMsg('⚠️ รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร')
             return
         }
         if (regPassword !== regConfirmPassword) {
-            setErrorMsg('รหัสผ่านและยืนยันรหัสผ่านไม่ตรงกัน')
+            setErrorMsg('⚠️ รหัสผ่านและยืนยันรหัสผ่านไม่ตรงกัน กรุณาตรวจสอบอีกครั้ง')
             return
         }
 
@@ -101,7 +101,7 @@ export default function LoginPage() {
                 setSuccessMsg(`🎉 สมัครสมาชิกสำเร็จ! สร้างบัญชีใหม่สำหรับคุณ ${res.user.name} เรียบร้อย`)
                 setTimeout(() => router.push('/'), 400)
             } else {
-                setErrorMsg(res.error || 'คุณต้องมีรหัสสมัครจากเจ้าของเว็บ (sakchawit)')
+                setErrorMsg(`⚠️ ${res.error || 'คุณต้องมีรหัสสมัครจากเจ้าของเว็บ (sakchawit)'}`)
             }
         }, 150)
     }
@@ -287,23 +287,41 @@ export default function LoginPage() {
                                 </button>
                             </div>
 
-                            {/* Notice Banners */}
+                            {/* CUSTOM BEAUTIFUL ALERT POPUP BANNERS (แทนที่ Browser Native Popups) */}
                             {errorMsg && (
-                                <div className="mb-4 p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs font-medium flex items-center gap-2 animate-fade-in-up">
-                                    <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0"></span>
-                                    {errorMsg}
+                                <div className="mb-4 p-4 rounded-2xl bg-gradient-to-r from-rose-500/20 to-red-500/20 border border-rose-500/40 text-rose-300 text-xs font-bold flex items-start justify-between gap-3 shadow-lg animate-fade-in-up backdrop-blur-md">
+                                    <div className="flex items-start gap-2.5">
+                                        <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5 animate-bounce" />
+                                        <span className="leading-relaxed">{errorMsg}</span>
+                                    </div>
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setErrorMsg('')}
+                                        className="text-rose-400 hover:text-white p-0.5 rounded cursor-pointer"
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </button>
                                 </div>
                             )}
                             {successMsg && (
-                                <div className="mb-4 p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 text-xs font-medium flex items-center gap-2 animate-fade-in-up">
-                                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                                    {successMsg}
+                                <div className="mb-4 p-4 rounded-2xl bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center justify-between gap-3 shadow-lg animate-fade-in-up backdrop-blur-md">
+                                    <div className="flex items-center gap-2.5">
+                                        <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                                        <span>{successMsg}</span>
+                                    </div>
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setSuccessMsg('')}
+                                        className="text-emerald-400 hover:text-white p-0.5 rounded cursor-pointer"
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </button>
                                 </div>
                             )}
 
                             {/* MODE 1: LOGIN FORM */}
                             {mode === 'login' ? (
-                                <form onSubmit={handleLoginSubmit} className="space-y-4">
+                                <form onSubmit={handleLoginSubmit} noValidate className="space-y-4">
                                     <div>
                                         <label className={`block text-xs font-semibold mb-1.5 tracking-wide ${isLight ? 'text-slate-700' : 'text-gray-300'}`}>
                                             ชื่อผู้ใช้ (Username) หรือ อีเมล (Email) *
@@ -320,7 +338,6 @@ export default function LoginPage() {
                                                         : 'bg-white/[0.04] border border-white/10 text-white placeholder-gray-500'
                                                 }`}
                                                 placeholder="เช่น sakchawit หรือ name@example.com"
-                                                required
                                             />
                                         </div>
                                     </div>
@@ -341,7 +358,6 @@ export default function LoginPage() {
                                                         : 'bg-white/[0.04] border border-white/10 text-white placeholder-gray-500'
                                                 }`}
                                                 placeholder="••••••••"
-                                                required
                                             />
                                             <button
                                                 type="button"
@@ -372,8 +388,8 @@ export default function LoginPage() {
                                     </button>
                                 </form>
                             ) : (
-                                /* MODE 2: REGISTER FORM (รวมรหัสสมัครจากเจ้าของเว็บ) */
-                                <form onSubmit={handleRegisterSubmit} className="space-y-4">
+                                /* MODE 2: REGISTER FORM (ไม่ใช้ Browser Native Validation Popup) */
+                                <form onSubmit={handleRegisterSubmit} noValidate className="space-y-4">
                                     {/* รหัสอนุมัติสมัครจากเจ้าของเว็บ */}
                                     <div>
                                         <label className={`block text-xs font-semibold mb-1.5 tracking-wide flex items-center justify-between ${isLight ? 'text-slate-700' : 'text-gray-300'}`}>
@@ -392,7 +408,6 @@ export default function LoginPage() {
                                                         : 'bg-white/[0.04] border border-amber-500/40 text-amber-300 placeholder-gray-500'
                                                 }`}
                                                 placeholder="ใส่รหัสสมัคร เช่น sakchawit"
-                                                required
                                             />
                                         </div>
                                     </div>
@@ -413,7 +428,6 @@ export default function LoginPage() {
                                                         : 'bg-white/[0.04] border border-white/10 text-white placeholder-gray-500'
                                                 }`}
                                                 placeholder="เช่น sakchawit หรือ ร้านเกมเมอร์ช็อป"
-                                                required
                                             />
                                         </div>
                                     </div>
@@ -434,7 +448,6 @@ export default function LoginPage() {
                                                         : 'bg-white/[0.04] border border-white/10 text-white placeholder-gray-500'
                                                 }`}
                                                 placeholder="name@example.com"
-                                                required
                                             />
                                         </div>
                                     </div>
@@ -455,7 +468,6 @@ export default function LoginPage() {
                                                         : 'bg-white/[0.04] border border-white/10 text-white placeholder-gray-500'
                                                 }`}
                                                 placeholder="อย่างน้อย 6 ตัวอักษร"
-                                                required
                                             />
                                             <button
                                                 type="button"
@@ -483,7 +495,6 @@ export default function LoginPage() {
                                                         : 'bg-white/[0.04] border border-white/10 text-white placeholder-gray-500'
                                                 }`}
                                                 placeholder="พิมพ์รหัสผ่านเดิมอีกครั้ง"
-                                                required
                                             />
                                         </div>
                                     </div>
