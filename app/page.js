@@ -10,7 +10,8 @@ import {
     Sparkles, RefreshCw, LogOut, ChevronDown, Check, CreditCard, User, Layers,
     Database, Copy, Terminal, ShieldCheck, Flame, PieChart as PieIcon, ArrowRight,
     Phone, Share2, Calendar, Tag, Wallet, Receipt, AlertTriangle, CheckCircle, Info,
-    Sun, Moon, Calculator, Image as ImageIcon, Upload, Eye, PartyPopper, Rocket
+    Sun, Moon, Calculator, Image as ImageIcon, Upload, Eye, PartyPopper, Rocket,
+    Crown, Key, Users, Settings
 } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell, PieChart, Pie } from 'recharts'
 import { 
@@ -26,7 +27,11 @@ import {
     getInstallmentsFromSupabase,
     saveInstallmentToSupabase,
     updatePaymentInSupabase,
-    deleteInstallmentFromSupabase
+    deleteInstallmentFromSupabase,
+    getInviteCodeFromStorage,
+    saveInviteCodeToStorage,
+    getUsersFromStorage,
+    adminCreateUserAccount
 } from '@/utils/supabaseClient'
 
 const CATEGORY_COLORS_DARK = {
@@ -59,6 +64,15 @@ export default function ProfitTrackerDashboard() {
     // Welcome Pop-up Modal State
     const [showWelcomeModal, setShowWelcomeModal] = useState(false)
 
+    // Owner Admin Panel Modal State (สำหรับเจ้าของระบบ sakchawit)
+    const [showOwnerModal, setShowOwnerModal] = useState(false)
+    const [ownerTab, setOwnerTab] = useState('create') // 'create', 'code', 'users'
+    const [ownerInviteCodeInput, setOwnerInviteCodeInput] = useState('')
+    const [adminNewName, setAdminNewName] = useState('')
+    const [adminNewEmail, setAdminNewEmail] = useState('')
+    const [adminNewPassword, setAdminNewPassword] = useState('')
+    const [allUsersList, setAllUsersList] = useState([])
+
     // Supabase DB connection state
     const [dbConnected, setDbConnected] = useState(false)
     const [isFetching, setIsFetching] = useState(true)
@@ -87,7 +101,7 @@ export default function ProfitTrackerDashboard() {
     // Toast Notification
     const [toastMessage, setToastMessage] = useState('')
 
-    // New Profit Form State (ราคารับ, ราคาขายออก, วันที่ขาย, หมวดหมู่, รูปภาพ)
+    // New Profit Form State
     const [profitTitle, setProfitTitle] = useState('')
     const [profitCategory, setProfitCategory] = useState('ขายไอดี')
     const [profitCost, setProfitCost] = useState('')
@@ -97,7 +111,7 @@ export default function ProfitTrackerDashboard() {
     const [profitNote, setProfitNote] = useState('')
     const [profitImage, setProfitImage] = useState('')
 
-    // New Installment Form State (รวมรูปภาพสลิป/สินค้า)
+    // New Installment Form State
     const [instCustomer, setInstCustomer] = useState('')
     const [instItem, setInstItem] = useState('')
     const [instTotal, setInstTotal] = useState('')
@@ -139,6 +153,10 @@ export default function ProfitTrackerDashboard() {
         }
         setCurrentUser(user)
         setIsAuthChecking(false)
+
+        // Init Owner Invite Code & User List
+        setOwnerInviteCodeInput(getInviteCodeFromStorage())
+        setAllUsersList(getUsersFromStorage())
 
         // Trigger Welcome Pop-up Modal every time user fresh logs in or registers
         const justLoggedIn = sessionStorage.getItem('just_logged_in')
@@ -204,6 +222,40 @@ export default function ProfitTrackerDashboard() {
         triggerToast('👋 ออกจากระบบเรียบร้อยแล้ว')
         setTimeout(() => router.push('/login'), 400)
     }
+
+    // Owner Admin Handlers
+    const handleAdminCreateAccount = (e) => {
+        e.preventDefault()
+        if (!adminNewName || !adminNewEmail || !adminNewPassword) {
+            triggerToast('⚠️ กรุณากรอกข้อมูลให้ครบถ้วนทุกช่อง')
+            return
+        }
+        const res = adminCreateUserAccount(adminNewName, adminNewEmail, adminNewPassword)
+        if (res.success) {
+            triggerToast(`🎉 สร้างบัญชีผู้ใช้ใหม่สำหรับคุณ ${res.user.name} สำเร็จ!`)
+            setAdminNewName('')
+            setAdminNewEmail('')
+            setAdminNewPassword('')
+            setAllUsersList(getUsersFromStorage())
+        } else {
+            triggerToast(`⚠️ ${res.error}`)
+        }
+    }
+
+    const handleSaveOwnerInviteCode = (e) => {
+        e.preventDefault()
+        if (!ownerInviteCodeInput) return
+        saveInviteCodeToStorage(ownerInviteCodeInput)
+        triggerToast(`🔑 บันทึกรหัสเชิญสมัครใหม่ "${ownerInviteCodeInput}" สำเร็จ!`)
+    }
+
+    // Is Owner Check (sakchawit or admin)
+    const isOwnerAdmin = useMemo(() => {
+        if (!currentUser) return false
+        const name = (currentUser.name || '').toLowerCase()
+        const email = (currentUser.email || '').toLowerCase()
+        return name.includes('sakchawit') || email.includes('admin') || currentUser.isAdmin === true
+    }, [currentUser])
 
     // 100% ACCURATE REALTIME CHART CALCULATIONS
     const monthlySummary = useMemo(() => {
@@ -478,6 +530,19 @@ export default function ProfitTrackerDashboard() {
 
                     {/* Right Header Actions */}
                     <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+                        {/* Owner Admin Panel Button (เจ้าของเว็บ sakchawit) */}
+                        {isOwnerAdmin && (
+                            <button
+                                type="button"
+                                onClick={() => setShowOwnerModal(true)}
+                                className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold text-xs shadow-md flex items-center gap-1.5 hover:scale-105 transition-transform cursor-pointer"
+                                title="เมนูจัดการสมาชิกสำหรับเจ้าของระบบ"
+                            >
+                                <Crown className="w-4 h-4 text-amber-100" />
+                                <span className="hidden sm:inline">จัดการสิทธิ์สมาชิก</span>
+                            </button>
+                        )}
+
                         <button
                             type="button"
                             onClick={() => setShowMoneyParticles(!showMoneyParticles)}
@@ -536,7 +601,7 @@ export default function ProfitTrackerDashboard() {
                             💼 ระบบบันทึกกำไร & ยอดผ่อนชำระ
                         </h1>
                         <p className={`text-xs sm:text-sm mt-0.5 ${isLight ? 'text-slate-600' : 'text-gray-400'}`}>
-                            บัญชีของคุณ <span className="text-indigo-500 font-bold">{currentUser?.name}</span> • แยกข้อมูลเฉพาะบัญชีนี้ 100%
+                            บัญชีของคุณ <span className="text-indigo-500 font-bold">{currentUser?.name}</span> {isOwnerAdmin && <span className="text-amber-400 font-bold ml-1">(เจ้าของระบบ 👑)</span>} • แยกข้อมูลเฉพาะบัญชีนี้ 100%
                         </p>
                     </div>
 
@@ -1008,13 +1073,12 @@ export default function ProfitTrackerDashboard() {
                 </div>
             </main>
 
-            {/* WELCOME POP-UP MODAL (เด้งต้อนรับหลังเข้าสู่ระบบ สามารถกากบาทปิดได้) */}
+            {/* WELCOME POP-UP MODAL */}
             {showWelcomeModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in-up">
                     <div className={`border w-full max-w-md rounded-3xl shadow-2xl p-6 sm:p-8 relative overflow-hidden text-center ${
                         isLight ? 'bg-white border-indigo-200 text-slate-900' : 'bg-[#101222] border-indigo-500/30 text-white'
                     }`}>
-                        {/* Close X Button */}
                         <button 
                             type="button" 
                             onClick={() => setShowWelcomeModal(false)}
@@ -1023,7 +1087,6 @@ export default function ProfitTrackerDashboard() {
                             <X className="w-5 h-5" />
                         </button>
 
-                        {/* Animated Mascot / Party Icon */}
                         <div className="relative w-24 h-24 mx-auto mb-4 flex items-center justify-center">
                             <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-indigo-500/30 via-purple-500/30 to-pink-500/30 blur-xl animate-pulse"></div>
                             <img 
@@ -1046,7 +1109,6 @@ export default function ProfitTrackerDashboard() {
                             </p>
                         </div>
 
-                        {/* Quick Tips Box */}
                         <div className={`p-4 rounded-2xl border text-left text-xs space-y-2 mb-6 ${
                             isLight ? 'bg-slate-50 border-slate-200' : 'bg-white/[0.03] border-white/10'
                         }`}>
@@ -1072,6 +1134,185 @@ export default function ProfitTrackerDashboard() {
                             <span>เริ่มใช้งานระบบเลย</span>
                             <Rocket className="w-4 h-4" />
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {/* OWNER ADMIN PANEL MODAL (เฉพาะเจ้าของระบบ sakchawit สามารถสร้างบัญชีและตั้งค่ารหัสอนุมัติได้) */}
+            {showOwnerModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-fade-in-up">
+                    <div className={`border w-full max-w-lg rounded-3xl shadow-2xl p-6 sm:p-8 relative max-h-[90vh] overflow-y-auto ${
+                        isLight ? 'bg-white border-amber-300 text-slate-900' : 'bg-[#121426] border-amber-500/40 text-white'
+                    }`}>
+                        <div className="flex justify-between items-center mb-4">
+                            <div className="flex items-center gap-2">
+                                <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                                    <Crown className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-black tracking-tight">ระบบจัดการสิทธิ์สมาชิก (Owner Panel)</h3>
+                                    <p className="text-[11px] text-amber-400 font-bold">สำหรับเจ้าของเว็บ {currentUser?.name}</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setShowOwnerModal(false)} className="text-gray-400 hover:text-white p-1 cursor-pointer">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Owner Admin Tabs */}
+                        <div className={`flex p-1 rounded-2xl mb-5 border text-xs font-bold ${
+                            isLight ? 'bg-slate-100 border-slate-200' : 'bg-white/5 border-white/5'
+                        }`}>
+                            <button
+                                type="button"
+                                onClick={() => setOwnerTab('create')}
+                                className={`flex-1 py-2 rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                                    ownerTab === 'create' ? 'bg-amber-500 text-white shadow-md' : 'text-gray-400 hover:text-white'
+                                }`}
+                            >
+                                <Plus className="w-3.5 h-3.5" />
+                                <span>สร้างบัญชีให้ลูกค้า</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setOwnerTab('code')}
+                                className={`flex-1 py-2 rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                                    ownerTab === 'code' ? 'bg-amber-500 text-white shadow-md' : 'text-gray-400 hover:text-white'
+                                }`}
+                            >
+                                <Key className="w-3.5 h-3.5" />
+                                <span>ตั้งค่ารหัสสมัคร</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setOwnerTab('users')}
+                                className={`flex-1 py-2 rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                                    ownerTab === 'users' ? 'bg-amber-500 text-white shadow-md' : 'text-gray-400 hover:text-white'
+                                }`}
+                            >
+                                <Users className="w-3.5 h-3.5" />
+                                <span>รายชื่อสมาชิก ({allUsersList.length})</span>
+                            </button>
+                        </div>
+
+                        {/* TAB 1: OWNER DIRECTLY CREATES USER ACCOUNT */}
+                        {ownerTab === 'create' && (
+                            <form onSubmit={handleAdminCreateAccount} className="space-y-4 text-xs">
+                                <div>
+                                    <label className="block font-semibold mb-1">ชื่อผู้ใช้ / ชื่อร้านค้าลูกค้า *</label>
+                                    <input
+                                        type="text"
+                                        value={adminNewName}
+                                        onChange={(e) => setAdminNewName(e.target.value)}
+                                        placeholder="เช่น client_rov หรือ ร้านเกมเมอร์ช็อป"
+                                        className={`w-full border rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-amber-500 ${
+                                            isLight ? 'bg-slate-50 border-slate-200 text-slate-900' : 'bg-white/5 border-white/10 text-white'
+                                        }`}
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block font-semibold mb-1">อีเมลลูกค้า *</label>
+                                    <input
+                                        type="email"
+                                        value={adminNewEmail}
+                                        onChange={(e) => setAdminNewEmail(e.target.value)}
+                                        placeholder="client@example.com"
+                                        className={`w-full border rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-amber-500 ${
+                                            isLight ? 'bg-slate-50 border-slate-200 text-slate-900' : 'bg-white/5 border-white/10 text-white'
+                                        }`}
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block font-semibold mb-1">ตั้งรหัสผ่านลูกค้า *</label>
+                                    <input
+                                        type="text"
+                                        value={adminNewPassword}
+                                        onChange={(e) => setAdminNewPassword(e.target.value)}
+                                        placeholder="password123"
+                                        className={`w-full border rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-amber-500 font-mono ${
+                                            isLight ? 'bg-slate-50 border-slate-200 text-slate-900' : 'bg-white/5 border-white/10 text-white'
+                                        }`}
+                                        required
+                                    />
+                                </div>
+
+                                <button
+                                    type="submit"
+                                    className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl font-bold shadow-lg shadow-amber-500/30 hover:scale-[1.01] active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2 text-sm"
+                                >
+                                    <Plus className="w-4 h-4" />
+                                    <span>สร้างบัญชีใหม่ให้ลูกค้าทันที</span>
+                                </button>
+                            </form>
+                        )}
+
+                        {/* TAB 2: OWNER SETS REGISTRATION INVITE CODE */}
+                        {ownerTab === 'code' && (
+                            <form onSubmit={handleSaveOwnerInviteCode} className="space-y-4 text-xs">
+                                <div className={`p-3.5 rounded-xl border text-xs space-y-1.5 ${
+                                    isLight ? 'bg-amber-50 border-amber-200 text-amber-900' : 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                                }`}>
+                                    <div className="font-bold flex items-center gap-1">
+                                        <Key className="w-4 h-4" />
+                                        <span>รหัสเชิญสมัครสมาชิกปัจจุบัน:</span>
+                                    </div>
+                                    <div className="text-lg font-black text-amber-400 font-mono tracking-wider">
+                                        {ownerInviteCodeInput || 'sakchawit'}
+                                    </div>
+                                    <p className="text-[11px] opacity-80">ผู้ใช้คนอื่นที่ไม่มีรหัสนี้ จะไม่สามารถสมัครสมาชิกด้วยตนเองได้</p>
+                                </div>
+
+                                <div>
+                                    <label className="block font-semibold mb-1">เปลี่ยนรหัสอนุมัติสมัครสมาชิกใหม่ *</label>
+                                    <input
+                                        type="text"
+                                        value={ownerInviteCodeInput}
+                                        onChange={(e) => setOwnerInviteCodeInput(e.target.value)}
+                                        placeholder="เช่น sakchawit หรือ VIP2026"
+                                        className={`w-full border rounded-xl p-3 font-bold text-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-500 ${
+                                            isLight ? 'bg-slate-50 border-slate-200' : 'bg-white/5 border-white/10'
+                                        }`}
+                                        required
+                                    />
+                                </div>
+
+                                <button
+                                    type="submit"
+                                    className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl font-bold shadow-lg shadow-amber-500/30 hover:scale-[1.01] active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2 text-sm"
+                                >
+                                    <Check className="w-4 h-4" />
+                                    <span>บันทึกเปลี่ยนรหัสอนุมัติใหม่</span>
+                                </button>
+                            </form>
+                        )}
+
+                        {/* TAB 3: ALL USERS LIST */}
+                        {ownerTab === 'users' && (
+                            <div className="space-y-3 max-h-[350px] overflow-y-auto text-xs">
+                                {allUsersList.map((u) => (
+                                    <div key={u.id} className={`p-3.5 rounded-xl border flex items-center justify-between ${
+                                        isLight ? 'bg-slate-50 border-slate-200' : 'bg-white/5 border-white/10'
+                                    }`}>
+                                        <div>
+                                            <div className="font-bold flex items-center gap-1.5">
+                                                <span>{u.name}</span>
+                                                {(u.name.toLowerCase() === 'sakchawit' || u.isAdmin) && (
+                                                    <span className="px-2 py-0.5 text-[9px] rounded-full bg-amber-500/20 text-amber-400 font-bold border border-amber-500/30">
+                                                        👑 เจ้าของระบบ
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="text-gray-400 text-[11px]">{u.email}</div>
+                                        </div>
+                                        <div className="text-right">
+                                            <span className="font-mono text-[11px] text-indigo-400 font-bold">รหัสผ่าน: {u.password}</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

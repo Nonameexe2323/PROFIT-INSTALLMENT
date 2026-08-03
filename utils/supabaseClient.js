@@ -7,13 +7,15 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 const USERS_STORAGE_KEY = 'jiksaw_users_v1'
 const SESSION_KEY = 'jiksaw_current_user_v1'
+const INVITE_CODE_KEY = 'jiksaw_invite_code_v1'
 
-// Default Admin User for initial setup
+// Default Admin User (sakchawit - เจ้าของระบบ)
 const DEFAULT_DEMO_USER = {
     id: 'user_admin_default',
     name: 'sakchawit',
     email: 'admin@system.com',
-    password: 'password123'
+    password: 'password123',
+    isAdmin: true
 }
 
 // Initial Sample Data for default admin user
@@ -56,7 +58,27 @@ export const DEFAULT_INSTALLMENTS = [
     }
 ]
 
-// ==================== AUTHENTICATION SERVICES ====================
+// ==================== AUTHENTICATION & INVITE CODE SERVICES ====================
+
+export function getInviteCodeFromStorage() {
+    if (typeof window === 'undefined') return 'sakchawit'
+    try {
+        const saved = localStorage.getItem(INVITE_CODE_KEY)
+        if (saved) return saved
+    } catch (e) {
+        console.warn('Get invite code error:', e)
+    }
+    return 'sakchawit'
+}
+
+export function saveInviteCodeToStorage(code) {
+    if (typeof window === 'undefined') return
+    try {
+        localStorage.setItem(INVITE_CODE_KEY, code.trim())
+    } catch (e) {
+        console.warn('Save invite code error:', e)
+    }
+}
 
 export function getUsersFromStorage() {
     if (typeof window === 'undefined') return [DEFAULT_DEMO_USER]
@@ -124,8 +146,10 @@ export function registerNewUser(name, email, password, inviteCode) {
     const trimmedEmail = email.trim().toLowerCase()
     const trimmedCode = (inviteCode || '').trim().toLowerCase()
 
-    // Validate Owner Invite Code (sakchawit / sakchawit2026 / admin)
-    const validCodes = ['sakchawit', 'sakchawit2026', 'sakchawit123', 'admin', 'sakchawitshop']
+    // Validate Owner Invite Code
+    const activeInviteCode = getInviteCodeFromStorage().toLowerCase()
+    const validCodes = [activeInviteCode, 'sakchawit', 'sakchawit2026', 'admin', 'sakchawitshop']
+    
     if (!trimmedCode || !validCodes.includes(trimmedCode)) {
         return { 
             success: false, 
@@ -155,6 +179,34 @@ export function registerNewUser(name, email, password, inviteCode) {
 
     // Set current active user session
     setCurrentUserSession(newUser, true)
+
+    return { success: true, user: newUser }
+}
+
+// Owner Admin Function: Directly Create User Account
+export function adminCreateUserAccount(name, email, password) {
+    const users = getUsersFromStorage()
+    const trimmedName = name.trim()
+    const trimmedEmail = email.trim().toLowerCase()
+
+    const existing = users.find(u => 
+        (u.email && u.email.toLowerCase() === trimmedEmail) || 
+        (u.name && u.name.toLowerCase() === trimmedName.toLowerCase())
+    )
+    if (existing) {
+        return { success: false, error: 'ชื่อผู้ใช้หรืออีเมลนี้มีในระบบแล้ว' }
+    }
+
+    const newUser = {
+        id: `user_${Date.now()}`,
+        name: trimmedName,
+        email: trimmedEmail,
+        password: password,
+        createdAt: new Date().toISOString()
+    }
+
+    users.push(newUser)
+    saveUsersToStorage(users)
 
     return { success: true, user: newUser }
 }
