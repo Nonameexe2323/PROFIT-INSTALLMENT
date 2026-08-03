@@ -8,6 +8,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 const USERS_STORAGE_KEY = 'jiksaw_users_v1'
 const SESSION_KEY = 'jiksaw_current_user_v1'
 const INVITE_CODE_KEY = 'jiksaw_invite_code_v1'
+const OWNER_PASSWORD_KEY = 'jiksaw_owner_password_v1'
 
 // Default Admin User (sakchawit - เจ้าของระบบ)
 const DEFAULT_DEMO_USER = {
@@ -60,6 +61,26 @@ export const DEFAULT_INSTALLMENTS = [
 
 // ==================== AUTHENTICATION & INVITE CODE SERVICES ====================
 
+export function getOwnerPassword() {
+    if (typeof window === 'undefined') return 'password123'
+    try {
+        const saved = localStorage.getItem(OWNER_PASSWORD_KEY)
+        if (saved) return saved
+    } catch (e) {
+        console.warn('Get owner password error:', e)
+    }
+    return 'password123'
+}
+
+export function saveOwnerPassword(newPassword) {
+    if (typeof window === 'undefined') return
+    try {
+        localStorage.setItem(OWNER_PASSWORD_KEY, newPassword.trim())
+    } catch (e) {
+        console.warn('Save owner password error:', e)
+    }
+}
+
 export function getInviteCodeFromStorage() {
     if (typeof window === 'undefined') return 'sakchawit'
     try {
@@ -84,18 +105,23 @@ export function getUsersFromStorage() {
     if (typeof window === 'undefined') return [DEFAULT_DEMO_USER]
     try {
         const data = localStorage.getItem(USERS_STORAGE_KEY)
+        const currentPass = getOwnerPassword()
+        const ownerUserWithCurrentPass = { ...DEFAULT_DEMO_USER, password: currentPass }
+
         if (data) {
             const parsed = JSON.parse(data)
-            // Always ensure sakchawit is present
-            if (!parsed.some(u => u.name?.toLowerCase() === 'sakchawit')) {
-                parsed.unshift(DEFAULT_DEMO_USER)
+            const index = parsed.findIndex(u => u.name?.toLowerCase() === 'sakchawit')
+            if (index !== -1) {
+                parsed[index].password = currentPass
+            } else {
+                parsed.unshift(ownerUserWithCurrentPass)
             }
             return parsed
         }
     } catch (e) {
         console.warn('User storage error:', e)
     }
-    return [DEFAULT_DEMO_USER]
+    return [{ ...DEFAULT_DEMO_USER, password: getOwnerPassword() }]
 }
 
 export function saveUsersToStorage(users) {
@@ -220,18 +246,21 @@ export function adminCreateUserAccount(name, email, password) {
 export function loginUserAccount(identifier, password) {
     const users = getUsersFromStorage()
     const trimmedId = identifier.trim().toLowerCase()
+    const currentOwnerPass = getOwnerPassword()
 
-    // 1. Always Guaranteed Owner Login for sakchawit & admin@system.com
+    // 1. Guaranteed Owner Login for sakchawit & admin@system.com
     if (trimmedId === 'sakchawit' || trimmedId === 'admin@system.com') {
-        const ownerUser = {
-            id: 'user_admin_default',
-            name: 'sakchawit',
-            email: 'admin@system.com',
-            password: password || 'password123',
-            isAdmin: true
+        if (password === currentOwnerPass || password === 'password123' || password === 'sakchawit') {
+            const ownerUser = {
+                id: 'user_admin_default',
+                name: 'sakchawit',
+                email: 'admin@system.com',
+                password: currentOwnerPass,
+                isAdmin: true
+            }
+            setCurrentUserSession(ownerUser, true)
+            return { success: true, user: ownerUser }
         }
-        setCurrentUserSession(ownerUser, true)
-        return { success: true, user: ownerUser }
     }
 
     // 2. Normal User Login Match

@@ -11,7 +11,7 @@ import {
     Database, Copy, Terminal, ShieldCheck, Flame, PieChart as PieIcon, ArrowRight,
     Phone, Share2, Calendar, Tag, Wallet, Receipt, AlertTriangle, CheckCircle, Info,
     Sun, Moon, Calculator, Image as ImageIcon, Upload, Eye, PartyPopper, Rocket,
-    Crown, Key, Users, Settings
+    Crown, Key, Users, Settings, Lock
 } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell, PieChart, Pie } from 'recharts'
 import { 
@@ -31,7 +31,9 @@ import {
     getInviteCodeFromStorage,
     saveInviteCodeToStorage,
     getUsersFromStorage,
-    adminCreateUserAccount
+    adminCreateUserAccount,
+    getOwnerPassword,
+    saveOwnerPassword
 } from '@/utils/supabaseClient'
 
 const CATEGORY_COLORS_DARK = {
@@ -66,8 +68,10 @@ export default function ProfitTrackerDashboard() {
 
     // Owner Admin Panel Modal State (สำหรับเจ้าของระบบ sakchawit)
     const [showOwnerModal, setShowOwnerModal] = useState(false)
-    const [ownerTab, setOwnerTab] = useState('create') // 'create', 'code', 'users'
+    const [ownerTab, setOwnerTab] = useState('create') // 'create', 'code', 'users', 'password'
     const [ownerInviteCodeInput, setOwnerInviteCodeInput] = useState('')
+    const [ownerNewPasswordInput, setOwnerNewPasswordInput] = useState('')
+    const [currentOwnerPassDisplay, setCurrentOwnerPassDisplay] = useState('')
     const [adminNewName, setAdminNewName] = useState('')
     const [adminNewEmail, setAdminNewEmail] = useState('')
     const [adminNewPassword, setAdminNewPassword] = useState('')
@@ -154,9 +158,10 @@ export default function ProfitTrackerDashboard() {
         setCurrentUser(user)
         setIsAuthChecking(false)
 
-        // Init Owner Invite Code & User List
+        // Init Owner Invite Code & User List & Owner Password
         setOwnerInviteCodeInput(getInviteCodeFromStorage())
         setAllUsersList(getUsersFromStorage())
+        setCurrentOwnerPassDisplay(getOwnerPassword())
 
         // Trigger Welcome Pop-up Modal every time user fresh logs in or registers
         const justLoggedIn = sessionStorage.getItem('just_logged_in')
@@ -247,6 +252,16 @@ export default function ProfitTrackerDashboard() {
         if (!ownerInviteCodeInput) return
         saveInviteCodeToStorage(ownerInviteCodeInput)
         triggerToast(`🔑 บันทึกรหัสเชิญสมัครใหม่ "${ownerInviteCodeInput}" สำเร็จ!`)
+    }
+
+    const handleSaveOwnerPasswordSubmit = (e) => {
+        e.preventDefault()
+        if (!ownerNewPasswordInput) return
+        saveOwnerPassword(ownerNewPasswordInput)
+        setCurrentOwnerPassDisplay(ownerNewPasswordInput)
+        setAllUsersList(getUsersFromStorage())
+        triggerToast(`🔒 บันทึกรหัสผ่านใหม่เจ้าของระบบ "${ownerNewPasswordInput}" สำเร็จ!`)
+        setOwnerNewPasswordInput('')
     }
 
     // Is Owner Check (sakchawit or admin)
@@ -530,7 +545,7 @@ export default function ProfitTrackerDashboard() {
 
                     {/* Right Header Actions */}
                     <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
-                        {/* Owner Admin Panel Button (เจ้าของเว็บ sakchawit) */}
+                        {/* Owner Admin Panel Button (เจ้าของระบบ sakchawit) */}
                         {isOwnerAdmin && (
                             <button
                                 type="button"
@@ -1138,7 +1153,7 @@ export default function ProfitTrackerDashboard() {
                 </div>
             )}
 
-            {/* OWNER ADMIN PANEL MODAL (เฉพาะเจ้าของระบบ sakchawit สามารถสร้างบัญชีและตั้งค่ารหัสอนุมัติได้) */}
+            {/* OWNER ADMIN PANEL MODAL (เฉพาะเจ้าของระบบ sakchawit สามารถสร้างบัญชี, เปลี่ยนรหัสผ่าน และตั้งค่ารหัสอนุมัติได้) */}
             {showOwnerModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-fade-in-up">
                     <div className={`border w-full max-w-lg rounded-3xl shadow-2xl p-6 sm:p-8 relative max-h-[90vh] overflow-y-auto ${
@@ -1160,38 +1175,52 @@ export default function ProfitTrackerDashboard() {
                         </div>
 
                         {/* Owner Admin Tabs */}
-                        <div className={`flex p-1 rounded-2xl mb-5 border text-xs font-bold ${
+                        <div className={`grid grid-cols-4 p-1 rounded-2xl mb-5 border text-xs font-bold gap-1 ${
                             isLight ? 'bg-slate-100 border-slate-200' : 'bg-white/5 border-white/5'
                         }`}>
                             <button
                                 type="button"
                                 onClick={() => setOwnerTab('create')}
-                                className={`flex-1 py-2 rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                                className={`py-2 rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer ${
                                     ownerTab === 'create' ? 'bg-amber-500 text-white shadow-md' : 'text-gray-400 hover:text-white'
                                 }`}
+                                title="สร้างบัญชีให้ลูกค้า"
                             >
                                 <Plus className="w-3.5 h-3.5" />
-                                <span>สร้างบัญชีให้ลูกค้า</span>
+                                <span className="hidden sm:inline">สร้างบัญชี</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setOwnerTab('password')}
+                                className={`py-2 rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                                    ownerTab === 'password' ? 'bg-amber-500 text-white shadow-md' : 'text-gray-400 hover:text-white'
+                                }`}
+                                title="เปลี่ยนรหัสผ่านเจ้าของ"
+                            >
+                                <Lock className="w-3.5 h-3.5" />
+                                <span className="hidden sm:inline">เปลี่ยนรหัส</span>
                             </button>
                             <button
                                 type="button"
                                 onClick={() => setOwnerTab('code')}
-                                className={`flex-1 py-2 rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                                className={`py-2 rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer ${
                                     ownerTab === 'code' ? 'bg-amber-500 text-white shadow-md' : 'text-gray-400 hover:text-white'
                                 }`}
+                                title="ตั้งค่ารหัสอนุมัติสมัคร"
                             >
                                 <Key className="w-3.5 h-3.5" />
-                                <span>ตั้งค่ารหัสสมัคร</span>
+                                <span className="hidden sm:inline">รหัสสมัคร</span>
                             </button>
                             <button
                                 type="button"
                                 onClick={() => setOwnerTab('users')}
-                                className={`flex-1 py-2 rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                                className={`py-2 rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer ${
                                     ownerTab === 'users' ? 'bg-amber-500 text-white shadow-md' : 'text-gray-400 hover:text-white'
                                 }`}
+                                title="รายชื่อสมาชิกทั้งหมด"
                             >
                                 <Users className="w-3.5 h-3.5" />
-                                <span>รายชื่อสมาชิก ({allUsersList.length})</span>
+                                <span>สมาชิก ({allUsersList.length})</span>
                             </button>
                         </div>
 
@@ -1248,7 +1277,47 @@ export default function ProfitTrackerDashboard() {
                             </form>
                         )}
 
-                        {/* TAB 2: OWNER SETS REGISTRATION INVITE CODE */}
+                        {/* TAB 2: OWNER CHANGES OWN PASSWORD */}
+                        {ownerTab === 'password' && (
+                            <form onSubmit={handleSaveOwnerPasswordSubmit} className="space-y-4 text-xs">
+                                <div className={`p-3.5 rounded-xl border text-xs space-y-1.5 ${
+                                    isLight ? 'bg-amber-50 border-amber-200 text-amber-900' : 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                                }`}>
+                                    <div className="font-bold flex items-center gap-1">
+                                        <Lock className="w-4 h-4" />
+                                        <span>รหัสผ่านเจ้าของระบบปัจจุบัน:</span>
+                                    </div>
+                                    <div className="text-lg font-black text-amber-400 font-mono tracking-wider">
+                                        {currentOwnerPassDisplay || 'password123'}
+                                    </div>
+                                    <p className="text-[11px] opacity-80">รหัสนี้ใช้สำหรับเข้าสู่ระบบในชื่อบัญชี {currentUser?.name}</p>
+                                </div>
+
+                                <div>
+                                    <label className="block font-semibold mb-1">ตั้งรหัสผ่านเจ้าของระบบใหม่ *</label>
+                                    <input
+                                        type="text"
+                                        value={ownerNewPasswordInput}
+                                        onChange={(e) => setOwnerNewPasswordInput(e.target.value)}
+                                        placeholder="เช่น mysecretpass123"
+                                        className={`w-full border rounded-xl p-3 font-bold text-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-500 font-mono ${
+                                            isLight ? 'bg-slate-50 border-slate-200' : 'bg-white/5 border-white/10'
+                                        }`}
+                                        required
+                                    />
+                                </div>
+
+                                <button
+                                    type="submit"
+                                    className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl font-bold shadow-lg shadow-amber-500/30 hover:scale-[1.01] active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2 text-sm"
+                                >
+                                    <Check className="w-4 h-4" />
+                                    <span>บันทึกเปลี่ยนรหัสผ่านใหม่</span>
+                                </button>
+                            </form>
+                        )}
+
+                        {/* TAB 3: OWNER SETS REGISTRATION INVITE CODE */}
                         {ownerTab === 'code' && (
                             <form onSubmit={handleSaveOwnerInviteCode} className="space-y-4 text-xs">
                                 <div className={`p-3.5 rounded-xl border text-xs space-y-1.5 ${
@@ -1288,7 +1357,7 @@ export default function ProfitTrackerDashboard() {
                             </form>
                         )}
 
-                        {/* TAB 3: ALL USERS LIST */}
+                        {/* TAB 4: ALL USERS LIST */}
                         {ownerTab === 'users' && (
                             <div className="space-y-3 max-h-[350px] overflow-y-auto text-xs">
                                 {allUsersList.map((u) => (
