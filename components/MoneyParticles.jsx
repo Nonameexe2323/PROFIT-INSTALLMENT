@@ -1,56 +1,36 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useMemo } from 'react'
 
-const MONEY_SYMBOLS = ['💸', '💵', '💰', '🪙', '💎', '✨', '💳']
+const SYMBOLS = ['💸', '💵', '💰', '🪙', '💎', '✨']
 
-export default function MoneyParticles({ active = true, count = 28 }) {
-    const [particles, setParticles] = useState([])
+export default function MoneyParticles({ active = true, count = 16 }) {
+    const particles = useMemo(() => {
+        return Array.from({ length: count }).map((_, i) => {
+            const left = Math.floor(Math.random() * 94) + 3
+            const duration = (Math.random() * 4 + 5).toFixed(2) // 5s to 9s
+            const delay = (Math.random() * 4).toFixed(2)
+            const size = (Math.random() * 0.6 + 1.2).toFixed(2)
+            const symbol = SYMBOLS[i % SYMBOLS.length]
+            return { id: i, left, duration, delay, size, symbol }
+        })
+    }, [count])
 
-    useEffect(() => {
-        if (!active) {
-            setParticles([])
-            return
-        }
-
-        const items = Array.from({ length: count }).map((_, i) => ({
-            id: i,
-            symbol: MONEY_SYMBOLS[Math.floor(Math.random() * MONEY_SYMBOLS.length)],
-            left: Math.random() * 98,
-            duration: 6 + Math.random() * 9,
-            delay: Math.random() * 6,
-            size: 16 + Math.floor(Math.random() * 20),
-            opacity: 0.35 + Math.random() * 0.45,
-            spinDuration: 3 + Math.random() * 5
-        }))
-
-        setParticles(items)
-    }, [active, count])
-
-    if (!active || particles.length === 0) return null
+    if (!active) return null
 
     return (
-        <div className="fixed inset-0 pointer-events-none z-10 overflow-hidden">
+        <div className="fixed inset-0 pointer-events-none overflow-hidden z-20 gpu-accelerate">
             {particles.map((p) => (
                 <div
                     key={p.id}
-                    className="absolute animate-money-fall"
+                    className="absolute animate-money-fall select-none gpu-accelerate"
                     style={{
                         left: `${p.left}%`,
-                        top: '-50px',
-                        fontSize: `${p.size}px`,
-                        opacity: p.opacity,
+                        fontSize: `${p.size}rem`,
                         animationDuration: `${p.duration}s`,
                         animationDelay: `${p.delay}s`,
-                        animationIterationCount: 'infinite',
-                        animationTimingFunction: 'linear'
                     }}
                 >
-                    <span 
-                        className="inline-block animate-pulse"
-                        style={{ animationDuration: `${p.spinDuration}s` }}
-                    >
-                        {p.symbol}
-                    </span>
+                    {p.symbol}
                 </div>
             ))}
         </div>

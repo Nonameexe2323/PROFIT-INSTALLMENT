@@ -497,22 +497,22 @@ export default function ProfitTrackerDashboard() {
             isLight ? 'bg-slate-100 text-slate-900 selection:bg-indigo-600 selection:text-white' : 'bg-[#08080c] text-gray-100 selection:bg-indigo-500 selection:text-white'
         }`}>
             
-            {/* Falling Money Particles Effect */}
-            <MoneyParticles active={showMoneyParticles} count={28} />
+            {/* Falling Money Particles Effect (Optimized for 60FPS GPU Acceleration) */}
+            <MoneyParticles active={showMoneyParticles} count={16} />
 
             {/* Ambient Background Aura Blobs */}
             <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
-                <div className={`absolute top-[-10%] left-[-10%] w-[450px] sm:w-[550px] h-[450px] sm:h-[550px] rounded-full blur-[100px] transition-opacity duration-200 ${
-                    isLight ? 'bg-indigo-300/40' : 'bg-indigo-600/20'
+                <div className={`absolute top-[-10%] left-[-10%] w-[450px] sm:w-[550px] h-[450px] sm:h-[550px] rounded-full blur-[90px] transition-opacity duration-200 ${
+                    isLight ? 'bg-indigo-300/40' : 'bg-indigo-600/18'
                 }`}></div>
-                <div className={`absolute bottom-[10%] right-[-5%] w-[400px] sm:w-[500px] h-[400px] sm:h-[500px] rounded-full blur-[100px] transition-opacity duration-200 ${
-                    isLight ? 'bg-purple-300/40' : 'bg-purple-600/20'
+                <div className={`absolute bottom-[10%] right-[-5%] w-[400px] sm:w-[500px] h-[400px] sm:h-[500px] rounded-full blur-[90px] transition-opacity duration-200 ${
+                    isLight ? 'bg-purple-300/40' : 'bg-purple-600/18'
                 }`}></div>
             </div>
 
             {/* Floating Toast Notification */}
             {toastMessage && (
-                <div className={`fixed top-4 right-4 left-4 sm:left-auto z-50 px-4 py-3 rounded-2xl shadow-2xl flex items-center justify-center sm:justify-start gap-2.5 animate-fade-in-up border backdrop-blur-xl ${
+                <div className={`fixed top-4 right-4 left-4 sm:left-auto z-50 px-4 py-3 rounded-2xl shadow-2xl flex items-center justify-center sm:justify-start gap-2.5 animate-fade-in-up border backdrop-blur-md gpu-accelerate ${
                     isLight ? 'bg-white/95 border-slate-200 text-slate-900 shadow-slate-300/50' : 'bg-[#16192b]/95 border-indigo-500/40 text-white'
                 }`}>
                     <Sparkles className="w-4 h-4 text-amber-400 animate-spin shrink-0" />
@@ -521,7 +521,7 @@ export default function ProfitTrackerDashboard() {
             )}
 
             {/* Header Navbar */}
-            <header className={`sticky top-0 z-40 backdrop-blur-xl border-b px-3 sm:px-8 py-3 transition-all duration-150 ${
+            <header className={`sticky top-0 z-40 backdrop-blur-md border-b px-3 sm:px-8 py-3 transition-all duration-150 ${
                 isLight ? 'bg-white/85 border-slate-200/80' : 'bg-[#08080c]/85 border-white/10'
             }`}>
                 <div className="max-w-7xl mx-auto flex items-center justify-between gap-2">
@@ -641,8 +641,8 @@ export default function ProfitTrackerDashboard() {
 
                 {/* Stat Cards */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-5">
-                    <div className={`p-5 sm:p-6 rounded-2xl border backdrop-blur-xl transition-all duration-300 group relative overflow-hidden ${
-                        isLight ? 'bg-white/80 border-slate-200/80 shadow-xl shadow-slate-200/50 hover:border-emerald-500' : 'bg-[#10121e]/80 border-white/10 hover:border-emerald-500/50'
+                    <div className={`p-5 sm:p-6 rounded-2xl border transition-all duration-200 group relative overflow-hidden ${
+                        isLight ? 'bg-white/90 border-slate-200 shadow-xl shadow-slate-200/50 hover:border-emerald-500' : 'bg-[#10121e] border-white/10 hover:border-emerald-500/50'
                     }`}>
                         <div className="flex justify-between items-start mb-3">
                             <div className="p-2.5 bg-emerald-500/10 rounded-xl text-emerald-500 border border-emerald-500/20">
@@ -656,8 +656,8 @@ export default function ProfitTrackerDashboard() {
                         <p className="text-2.5xl sm:text-3.5xl font-black text-emerald-500">+{totalProfit.toLocaleString()} ฿</p>
                     </div>
 
-                    <div className={`p-5 sm:p-6 rounded-2xl border backdrop-blur-xl transition-all duration-300 group relative overflow-hidden ${
-                        isLight ? 'bg-white/80 border-slate-200/80 shadow-xl shadow-slate-200/50 hover:border-purple-500' : 'bg-[#10121e]/80 border-white/10 hover:border-purple-500/50'
+                    <div className={`p-5 sm:p-6 rounded-2xl border transition-all duration-200 group relative overflow-hidden ${
+                        isLight ? 'bg-white/90 border-slate-200 shadow-xl shadow-slate-200/50 hover:border-purple-500' : 'bg-[#10121e] border-white/10 hover:border-purple-500/50'
                     }`}>
                         <div className="flex justify-between items-start mb-3">
                             <div className="p-2.5 bg-purple-500/10 rounded-xl text-purple-500 border border-purple-500/20">
@@ -671,8 +671,8 @@ export default function ProfitTrackerDashboard() {
                         <p className={`text-2.5xl sm:text-3.5xl font-black ${isLight ? 'text-slate-900' : 'text-white'}`}>{totalSalesValue.toLocaleString()} ฿</p>
                     </div>
 
-                    <div className={`p-5 sm:p-6 rounded-2xl border backdrop-blur-xl transition-all duration-300 group relative overflow-hidden ${
-                        isLight ? 'bg-white/80 border-slate-200/80 shadow-xl shadow-slate-200/50 hover:border-amber-500' : 'bg-[#10121e]/80 border-white/10 hover:border-amber-500/50'
+                    <div className={`p-5 sm:p-6 rounded-2xl border transition-all duration-200 group relative overflow-hidden ${
+                        isLight ? 'bg-white/90 border-slate-200 shadow-xl shadow-slate-200/50 hover:border-amber-500' : 'bg-[#10121e] border-white/10 hover:border-amber-500/50'
                     }`}>
                         <div className="flex justify-between items-start mb-3">
                             <div className="p-2.5 bg-amber-500/10 rounded-xl text-amber-500 border border-amber-500/20">
@@ -686,8 +686,8 @@ export default function ProfitTrackerDashboard() {
                         <p className="text-2.5xl sm:text-3.5xl font-black text-amber-500">{totalInstallmentOutstanding.toLocaleString()} ฿</p>
                     </div>
 
-                    <div className={`p-5 sm:p-6 rounded-2xl border backdrop-blur-xl transition-all duration-300 group relative overflow-hidden ${
-                        isLight ? 'bg-white/80 border-slate-200/80 shadow-xl shadow-slate-200/50 hover:border-pink-500' : 'bg-[#10121e]/80 border-white/10 hover:border-pink-500/50'
+                    <div className={`p-5 sm:p-6 rounded-2xl border transition-all duration-200 group relative overflow-hidden ${
+                        isLight ? 'bg-white/90 border-slate-200 shadow-xl shadow-slate-200/50 hover:border-pink-500' : 'bg-[#10121e] border-white/10 hover:border-pink-500/50'
                     }`}>
                         <div className="flex justify-between items-start mb-3">
                             <div className="p-2.5 bg-pink-500/10 rounded-xl text-pink-500 border border-pink-500/20">
@@ -704,8 +704,8 @@ export default function ProfitTrackerDashboard() {
 
                 {/* Visual Charts Section */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-6">
-                    <div className={`lg:col-span-2 p-4 sm:p-6 rounded-2xl border backdrop-blur-xl ${
-                        isLight ? 'bg-white/80 border-slate-200/80 shadow-xl shadow-slate-200/50' : 'bg-[#10121e]/80 border-white/10'
+                    <div className={`lg:col-span-2 p-4 sm:p-6 rounded-2xl border ${
+                        isLight ? 'bg-white/90 border-slate-200 shadow-xl shadow-slate-200/50' : 'bg-[#10121e] border-white/10'
                     }`}>
                         <div className="flex justify-between items-center mb-3 sm:mb-4">
                             <div>
@@ -745,8 +745,8 @@ export default function ProfitTrackerDashboard() {
                         </ResponsiveContainer>
                     </div>
 
-                    <div className={`p-4 sm:p-6 rounded-2xl border backdrop-blur-xl flex flex-col justify-between ${
-                        isLight ? 'bg-white/80 border-slate-200/80 shadow-xl shadow-slate-200/50' : 'bg-[#10121e]/80 border-white/10'
+                    <div className={`p-4 sm:p-6 rounded-2xl border flex flex-col justify-between ${
+                        isLight ? 'bg-white/90 border-slate-200 shadow-xl shadow-slate-200/50' : 'bg-[#10121e] border-white/10'
                     }`}>
                         <div>
                             <h3 className={`text-base sm:text-lg font-bold flex items-center gap-2 mb-1 ${isLight ? 'text-slate-900' : 'text-white'}`}>
@@ -827,10 +827,10 @@ export default function ProfitTrackerDashboard() {
                                 .map((log) => (
                                     <div
                                         key={log.id}
-                                        className={`rounded-2xl border backdrop-blur-xl transition-all duration-300 relative group overflow-hidden flex flex-col justify-between hover:-translate-y-1 ${
+                                        className={`rounded-2xl border transition-all duration-200 relative group overflow-hidden flex flex-col justify-between hover:-translate-y-1 ${
                                             isLight 
-                                                ? 'bg-white/90 border-slate-200/80 shadow-lg shadow-slate-200/50 hover:border-indigo-400' 
-                                                : 'bg-[#10121e]/90 border-white/10 hover:border-indigo-500/50'
+                                                ? 'bg-white/90 border-slate-200 shadow-lg shadow-slate-200/50 hover:border-indigo-400' 
+                                                : 'bg-[#10121e] border-white/10 hover:border-indigo-500/50'
                                         }`}
                                     >
                                         {log.image && (
@@ -838,7 +838,7 @@ export default function ProfitTrackerDashboard() {
                                                 <img 
                                                     src={log.image} 
                                                     alt={log.title} 
-                                                    className="w-full h-full object-cover group-hover/img:scale-105 transition-transform duration-300"
+                                                    className="w-full h-full object-cover group-hover/img:scale-105 transition-transform duration-200"
                                                 />
                                                 <div className="absolute inset-0 bg-black/30 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center text-white font-bold text-xs gap-1">
                                                     <Eye className="w-4 h-4" />
@@ -916,8 +916,8 @@ export default function ProfitTrackerDashboard() {
                 </div>
 
                 {/* SECTION 2: INSTALLMENTS & CUSTOMER CONTACTS */}
-                <div className={`p-4 sm:p-6 rounded-2xl border backdrop-blur-xl space-y-4 sm:space-y-6 ${
-                    isLight ? 'bg-white/80 border-slate-200/80 shadow-xl shadow-slate-200/50' : 'bg-[#10121e]/80 border-white/10'
+                <div className={`p-4 sm:p-6 rounded-2xl border space-y-4 sm:space-y-6 ${
+                    isLight ? 'bg-white/90 border-slate-200 shadow-xl shadow-slate-200/50' : 'bg-[#10121e] border-white/10'
                 }`}>
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
                         <div>
@@ -1088,11 +1088,11 @@ export default function ProfitTrackerDashboard() {
                 </div>
             </main>
 
-            {/* WELCOME POP-UP MODAL */}
+            {/* WELCOME POP-UP MODAL (GPU Smooth 60FPS) */}
             {showWelcomeModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in-up">
-                    <div className={`border w-full max-w-md rounded-3xl shadow-2xl p-6 sm:p-8 relative overflow-hidden text-center ${
-                        isLight ? 'bg-white border-indigo-200 text-slate-900' : 'bg-[#101222] border-indigo-500/30 text-white'
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 animate-fade-in-up gpu-accelerate">
+                    <div className={`border w-full max-w-md rounded-3xl shadow-2xl p-6 sm:p-8 relative overflow-hidden text-center gpu-accelerate ${
+                        isLight ? 'bg-white border-indigo-200 text-slate-900' : 'bg-[#101222] border-indigo-500/40 text-white'
                     }`}>
                         <button 
                             type="button" 
@@ -1103,7 +1103,7 @@ export default function ProfitTrackerDashboard() {
                         </button>
 
                         <div className="relative w-24 h-24 mx-auto mb-4 flex items-center justify-center">
-                            <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-indigo-500/30 via-purple-500/30 to-pink-500/30 blur-xl animate-pulse"></div>
+                            <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-indigo-500/30 via-purple-500/30 to-pink-500/30 blur-lg"></div>
                             <img 
                                 src="/cat.png" 
                                 alt="Nyan Cat Welcome" 
@@ -1153,11 +1153,11 @@ export default function ProfitTrackerDashboard() {
                 </div>
             )}
 
-            {/* OWNER ADMIN PANEL MODAL (เฉพาะเจ้าของระบบ sakchawit สามารถสร้างบัญชี, เปลี่ยนรหัสผ่าน และตั้งค่ารหัสอนุมัติได้) */}
+            {/* OWNER ADMIN PANEL MODAL (GPU Smooth 60FPS) */}
             {showOwnerModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-fade-in-up">
-                    <div className={`border w-full max-w-lg rounded-3xl shadow-2xl p-6 sm:p-8 relative max-h-[90vh] overflow-y-auto ${
-                        isLight ? 'bg-white border-amber-300 text-slate-900' : 'bg-[#121426] border-amber-500/40 text-white'
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 animate-fade-in-up gpu-accelerate">
+                    <div className={`border w-full max-w-lg rounded-3xl shadow-2xl p-6 sm:p-8 relative max-h-[90vh] overflow-y-auto gpu-accelerate ${
+                        isLight ? 'bg-white border-amber-300 text-slate-900' : 'bg-[#101222] border-amber-500/40 text-white'
                     }`}>
                         <div className="flex justify-between items-center mb-4">
                             <div className="flex items-center gap-2">
@@ -1386,11 +1386,11 @@ export default function ProfitTrackerDashboard() {
                 </div>
             )}
 
-            {/* MODAL 1: ADD PROFIT LOG */}
+            {/* MODAL 1: ADD PROFIT LOG (GPU Smooth 60FPS) */}
             {showAddProfitModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-fade-in-up">
-                    <div className={`border w-full max-w-lg rounded-3xl shadow-2xl p-5 sm:p-8 relative max-h-[90vh] overflow-y-auto ${
-                        isLight ? 'bg-white border-slate-200 text-slate-900' : 'bg-[#121424] border-white/10 text-white'
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 animate-fade-in-up gpu-accelerate">
+                    <div className={`border w-full max-w-lg rounded-3xl shadow-2xl p-5 sm:p-8 relative max-h-[90vh] overflow-y-auto gpu-accelerate ${
+                        isLight ? 'bg-white border-slate-200 text-slate-900' : 'bg-[#101222] border-white/10 text-white'
                     }`}>
                         <div className="flex justify-between items-center mb-5">
                             <h3 className="text-lg sm:text-xl font-bold flex items-center gap-2">
@@ -1552,11 +1552,11 @@ export default function ProfitTrackerDashboard() {
                 </div>
             )}
 
-            {/* MODAL 2: ADD INSTALLMENT */}
+            {/* MODAL 2: ADD INSTALLMENT (GPU Smooth 60FPS) */}
             {showAddInstallmentModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-fade-in-up">
-                    <div className={`border w-full max-w-lg rounded-3xl shadow-2xl p-5 sm:p-8 relative max-h-[90vh] overflow-y-auto ${
-                        isLight ? 'bg-white border-slate-200 text-slate-900' : 'bg-[#121424] border-white/10 text-white'
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 animate-fade-in-up gpu-accelerate">
+                    <div className={`border w-full max-w-lg rounded-3xl shadow-2xl p-5 sm:p-8 relative max-h-[90vh] overflow-y-auto gpu-accelerate ${
+                        isLight ? 'bg-white border-slate-200 text-slate-900' : 'bg-[#101222] border-white/10 text-white'
                     }`}>
                         <div className="flex justify-between items-center mb-5">
                             <h3 className="text-lg sm:text-xl font-bold flex items-center gap-2">
@@ -1705,9 +1705,9 @@ export default function ProfitTrackerDashboard() {
 
             {/* MODAL 3: RECORD PAYMENT */}
             {paymentModalItem && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-fade-in-up">
-                    <div className={`border w-full max-w-md rounded-3xl shadow-2xl p-5 sm:p-6 relative ${
-                        isLight ? 'bg-white border-slate-200 text-slate-900' : 'bg-[#121424] border-white/10 text-white'
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 animate-fade-in-up gpu-accelerate">
+                    <div className={`border w-full max-w-md rounded-3xl shadow-2xl p-5 sm:p-6 relative gpu-accelerate ${
+                        isLight ? 'bg-white border-slate-200 text-slate-900' : 'bg-[#101222] border-white/10 text-white'
                     }`}>
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="text-base sm:text-lg font-bold flex items-center gap-2">
@@ -1754,7 +1754,7 @@ export default function ProfitTrackerDashboard() {
             {/* MODAL 4: FULLSCREEN LIGHTBOX IMAGE PREVIEW */}
             {lightboxImage && (
                 <div 
-                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-fade-in-up cursor-pointer"
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 animate-fade-in-up cursor-pointer gpu-accelerate"
                     onClick={() => setLightboxImage(null)}
                 >
                     <div className="relative max-w-4xl max-h-[90vh] overflow-hidden rounded-2xl shadow-2xl" onClick={(e) => e.stopPropagation()}>
@@ -1771,9 +1771,9 @@ export default function ProfitTrackerDashboard() {
 
             {/* MODAL 5: CONFIRM DELETE MODAL */}
             {deleteModalData && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-fade-in-up">
-                    <div className={`border w-full max-w-md rounded-3xl shadow-2xl p-6 sm:p-8 relative text-center overflow-hidden ${
-                        isLight ? 'bg-white border-rose-300 text-slate-900' : 'bg-[#141628] border-rose-500/30 text-white'
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 animate-fade-in-up gpu-accelerate">
+                    <div className={`border w-full max-w-md rounded-3xl shadow-2xl p-6 sm:p-8 relative text-center overflow-hidden gpu-accelerate ${
+                        isLight ? 'bg-white border-rose-300 text-slate-900' : 'bg-[#101222] border-rose-500/30 text-white'
                     }`}>
                         <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-500 flex items-center justify-center mx-auto mb-4 animate-bounce">
                             <AlertTriangle className="w-7 h-7 sm:w-8 sm:h-8" />

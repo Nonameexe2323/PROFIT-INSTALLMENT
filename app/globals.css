@@ -14,12 +14,14 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans);
   overflow-x: hidden;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
 }
 
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -32,87 +34,51 @@ body {
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #3f445c;
+  background: #3b3f54;
 }
 
-/* Animations */
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(16px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+/* GPU Acceleration for Ultra Smooth 60fps Performance */
+.gpu-accelerate {
+  transform: translateZ(0);
+  will-change: transform, opacity;
+  backface-visibility: hidden;
 }
 
-@keyframes floatSlow {
-  0%, 100% {
-    transform: translateY(0px);
-  }
-  50% {
-    transform: translateY(-8px);
-  }
-}
-
+/* Keyframes Animation for Falling Money Particles */
 @keyframes moneyFall {
   0% {
-    transform: translateY(-40px) rotate(0deg);
-    opacity: 0;
+    transform: translate3d(0, -10vh, 0) rotate(0deg);
+    opacity: 1;
   }
-  15% {
-    opacity: 0.85;
-  }
-  85% {
-    opacity: 0.85;
+  80% {
+    opacity: 0.8;
   }
   100% {
-    transform: translateY(105vh) rotate(360deg);
+    transform: translate3d(0, 110vh, 0) rotate(360deg);
     opacity: 0;
   }
 }
 
 .animate-money-fall {
-  animation: moneyFall linear infinite;
+  animation-name: moneyFall;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: transform, opacity;
+  transform: translateZ(0);
 }
 
-@keyframes pulseGlow {
-  0%, 100% {
-    opacity: 0.4;
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 12px, 0);
   }
-  50% {
-    opacity: 0.8;
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
   }
 }
 
 .animate-fade-in-up {
-  animation: fadeInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-.animate-float {
-  animation: floatSlow 4s ease-in-out infinite;
-}
-
-.animate-glow {
-  animation: pulseGlow 3s ease-in-out infinite;
-}
-
-/* Glassmorphism utilities */
-.glass-panel {
-  background: rgba(18, 20, 32, 0.65);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.glass-panel-hover {
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.glass-panel-hover:hover {
-  background: rgba(26, 29, 46, 0.8);
-  border-color: rgba(99, 102, 241, 0.3);
-  transform: translateY(-2px);
-  box-shadow: 0 12px 30px -10px rgba(99, 102, 241, 0.15);
+  animation: fadeInUp 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
 }
