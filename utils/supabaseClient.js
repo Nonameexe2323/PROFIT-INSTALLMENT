@@ -59,6 +59,44 @@ export const DEFAULT_INSTALLMENTS = [
     }
 ]
 
+// ==================== SUPABASE REMOTE SYNC FOR USERS ====================
+
+export async function saveUserToSupabase(user) {
+    try {
+        const { data, error } = await supabase
+            .from('users')
+            .upsert([{
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                password: user.password,
+                is_admin: user.isAdmin || false
+            }])
+        return { success: !error }
+    } catch (e) {
+        console.warn('Sync user to Supabase error:', e)
+        return { success: false }
+    }
+}
+
+export async function getUsersFromSupabaseRemote() {
+    try {
+        const { data, error } = await supabase
+            .from('users')
+            .select('*')
+        if (error || !data) return null
+        return data.map(u => ({
+            id: u.id,
+            name: u.name,
+            email: u.email,
+            password: u.password,
+            isAdmin: u.is_admin || false
+        }))
+    } catch {
+        return null
+    }
+}
+
 // ==================== AUTHENTICATION & INVITE CODE SERVICES ====================
 
 export function getOwnerPassword() {
@@ -208,6 +246,7 @@ export function registerNewUser(name, email, password, inviteCode) {
     const filteredUsers = users.filter(u => u.name?.toLowerCase() !== trimmedName.toLowerCase())
     filteredUsers.push(newUser)
     saveUsersToStorage(filteredUsers)
+    saveUserToSupabase(newUser)
 
     // Set current active user session
     setCurrentUserSession(newUser, true)
@@ -239,6 +278,7 @@ export function adminCreateUserAccount(name, email, password) {
 
     users.push(newUser)
     saveUsersToStorage(users)
+    saveUserToSupabase(newUser)
 
     return { success: true, user: newUser }
 }
@@ -259,6 +299,7 @@ export function loginUserAccount(identifier, password) {
                 isAdmin: true
             }
             setCurrentUserSession(ownerUser, true)
+            saveUserToSupabase(ownerUser)
             return { success: true, user: ownerUser }
         }
     }
