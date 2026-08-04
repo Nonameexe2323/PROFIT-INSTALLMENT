@@ -128,6 +128,7 @@ export default function ProfitTrackerDashboard() {
 
     // Custom Confirm Delete Modal State
     const [deleteModalData, setDeleteModalData] = useState(null)
+    const [deleteUserModalData, setDeleteUserModalData] = useState(null)
 
     // Toast Notification
     const [toastMessage, setToastMessage] = useState('')
@@ -354,21 +355,26 @@ export default function ProfitTrackerDashboard() {
         }
     }
 
-    const handleDeleteUserAccount = async (userId, targetUserName) => {
+    const handleDeleteUserAccount = (userId, targetUserName) => {
         if (targetUserName.toLowerCase() === 'sakchawit') {
             triggerToast('⚠️ ไม่สามารถลบบัญชีเจ้าของระบบ sakchawit ได้!')
             return
         }
-        if (confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบบัญชีคุณ ${targetUserName} ถาวรออกจาก Supabase?`)) {
-            triggerToast(`⏳ กำลังลบบัญชีคุณ ${targetUserName}...`)
-            const res = await adminDeleteUserInSupabase(userId)
-            if (res.success) {
-                triggerToast(`🗑️ ลบบัญชีคุณ ${targetUserName} ออกจาก Supabase ถาวรเรียบร้อย!`)
-                fetchUsersList()
-            } else {
-                triggerToast('⚠️ เกิดข้อผิดพลาดในการลบบัญชี')
-            }
+        setDeleteUserModalData({ userId, targetUserName })
+    }
+
+    const confirmDeleteUserAccount = async () => {
+        if (!deleteUserModalData) return
+        const { userId, targetUserName } = deleteUserModalData
+        triggerToast(`⏳ กำลังลบบัญชีคุณ ${targetUserName}...`)
+        const res = await adminDeleteUserInSupabase(userId)
+        if (res.success) {
+            triggerToast(`🗑️ ลบบัญชีคุณ ${targetUserName} ออกจาก Supabase ถาวรเรียบร้อย!`)
+            fetchUsersList()
+        } else {
+            triggerToast('⚠️ เกิดข้อผิดพลาดในการลบบัญชี')
         }
+        setDeleteUserModalData(null)
     }
 
     // Role Permission Check (แอดมิน vs ผู้ใช้ทั่วไป)
@@ -2039,6 +2045,54 @@ export default function ProfitTrackerDashboard() {
                             >
                                 <Trash2 className="w-4 h-4" />
                                 <span>ยืนยันลบรายการ</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL 6: CONFIRM DELETE USER ACCOUNT MODAL */}
+            {deleteUserModalData && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-fade-in-up gpu-accelerate">
+                    <div className={`border w-full max-w-md rounded-3xl shadow-2xl p-6 sm:p-8 relative text-center overflow-hidden gpu-accelerate transition-all ${
+                        isLight ? 'bg-white border-rose-300 text-slate-900' : 'bg-[#101222] border-rose-500/40 text-white'
+                    }`}>
+                        <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-500 flex items-center justify-center mx-auto mb-4 animate-bounce">
+                            <Trash2 className="w-7 h-7 sm:w-8 sm:h-8" />
+                        </div>
+
+                        <h3 className="text-lg sm:text-xl font-black mb-2 text-rose-500">
+                            ยืนยันลบบัญชีสมาชิกถาวร?
+                        </h3>
+
+                        <div className={`p-4 rounded-2xl border text-xs space-y-2 leading-relaxed mb-6 ${
+                            isLight ? 'bg-rose-50 border-rose-200 text-rose-900' : 'bg-rose-500/10 border-rose-500/20 text-rose-200'
+                        }`}>
+                            <p className="font-bold text-sm">
+                                คุณแน่ใจหรือไม่ว่าต้องการลบบัญชีคุณ "{deleteUserModalData.targetUserName}"?
+                            </p>
+                            <p className="opacity-80 text-[11px]">
+                                ⚠️ การลบบัญชีนี้จะทำการลบผู้ใช้และสิทธิ์การเข้าถึงจาก Supabase Database ถาวรทันที และจะไม่สามารถกู้คืนกลับมาได้
+                            </p>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setDeleteUserModalData(null)}
+                                className={`flex-1 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+                                    isLight ? 'bg-slate-100 hover:bg-slate-200 text-slate-700' : 'bg-white/10 hover:bg-white/20 text-gray-300'
+                                }`}
+                            >
+                                ยกเลิก
+                            </button>
+                            <button
+                                type="button"
+                                onClick={confirmDeleteUserAccount}
+                                className="flex-1 py-3 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-bold text-xs shadow-lg shadow-rose-600/30 transition-all cursor-pointer flex items-center justify-center gap-1.5 hover:scale-[1.02] active:scale-[0.98]"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                                <span>ยืนยันลบบัญชีถาวร</span>
                             </button>
                         </div>
                     </div>
