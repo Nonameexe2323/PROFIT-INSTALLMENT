@@ -451,11 +451,12 @@ export function getUserProfits(userId) {
     const key = getUserProfitsStorageKey(userId)
     try {
         const saved = localStorage.getItem(key)
-        if (saved) return JSON.parse(saved)
+        if (saved !== null) return JSON.parse(saved)
     } catch (e) {
         console.warn('Get user profits error:', e)
     }
     if (userId === DEFAULT_DEMO_USER.id) {
+        saveUserProfits(userId, DEFAULT_PROFIT_LOGS)
         return DEFAULT_PROFIT_LOGS
     }
     return []
@@ -476,11 +477,12 @@ export function getUserInstallments(userId) {
     const key = getUserInstallmentsStorageKey(userId)
     try {
         const saved = localStorage.getItem(key)
-        if (saved) return JSON.parse(saved)
+        if (saved !== null) return JSON.parse(saved)
     } catch (e) {
         console.warn('Get user installments error:', e)
     }
     if (userId === DEFAULT_DEMO_USER.id) {
+        saveUserInstallments(userId, DEFAULT_INSTALLMENTS)
         return DEFAULT_INSTALLMENTS
     }
     return []
