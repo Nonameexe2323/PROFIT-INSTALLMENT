@@ -164,6 +164,57 @@ export async function adminDeleteUserInSupabase(userId) {
     }
 }
 
+export async function updateUserPasswordInSupabase(userId, newPassword) {
+    try {
+        const { error } = await supabase
+            .from('users')
+            .update({ password: newPassword })
+            .eq('id', userId)
+
+        const users = getUsersFromStorage()
+        const updated = users.map(u => u.id === userId ? { ...u, password: newPassword } : u)
+        saveUsersToStorage(updated)
+
+        return { success: !error }
+    } catch (e) {
+        console.warn('Update user password error:', e)
+        return { success: false }
+    }
+}
+
+export function getUserContactFromStorage(userId) {
+    if (typeof window === 'undefined') return { contactLink: '', contactType: 'Line', bio: '', shopName: '', avatarImage: '', coverImage: '', tags: '' }
+    try {
+        const saved = localStorage.getItem(`jiksaw_user_contact_${userId}`)
+        if (saved) return JSON.parse(saved)
+    } catch (e) {
+        console.warn('Get user contact error:', e)
+    }
+    return { contactLink: '', contactType: 'Line', bio: '', shopName: '', avatarImage: '', coverImage: '', tags: '' }
+}
+
+export function saveUserContactToStorage(userId, contactData) {
+    if (typeof window === 'undefined') return
+    try {
+        localStorage.setItem(`jiksaw_user_contact_${userId}`, JSON.stringify(contactData))
+        // also update global contacts directory registry
+        const allContacts = JSON.parse(localStorage.getItem('jiksaw_all_user_contacts_registry') || '{}')
+        allContacts[userId] = contactData
+        localStorage.setItem('jiksaw_all_user_contacts_registry', JSON.stringify(allContacts))
+    } catch (e) {
+        console.warn('Save user contact error:', e)
+    }
+}
+
+export function getAllUserContactsRegistry() {
+    if (typeof window === 'undefined') return {}
+    try {
+        return JSON.parse(localStorage.getItem('jiksaw_all_user_contacts_registry') || '{}')
+    } catch (e) {
+        return {}
+    }
+}
+
 // ==================== AUTHENTICATION & INVITE CODE SERVICES ====================
 
 export function getOwnerPassword() {
@@ -275,22 +326,10 @@ export function logoutUserSession() {
     }
 }
 
-export async function registerNewUser(name, email, password, inviteCode) {
+export async function registerNewUser(name, email, password) {
     const users = await getAllUsersFromSupabase()
     const trimmedName = name.trim()
     const trimmedEmail = email.trim().toLowerCase()
-    const trimmedCode = (inviteCode || '').trim().toLowerCase()
-
-    // Validate Owner Invite Code
-    const activeInviteCode = getInviteCodeFromStorage().toLowerCase()
-    const validCodes = [activeInviteCode, 'sakchawit', 'sakchawit2026', 'admin', 'sakchawitshop']
-    
-    if (!trimmedCode || !validCodes.includes(trimmedCode)) {
-        return { 
-            success: false, 
-            error: 'คุณต้องมีรหัสสมัครจากเจ้าของเว็บ (sakchawit)' 
-        }
-    }
 
     // Check existing name or email
     const existing = users.find(u => 
@@ -301,12 +340,14 @@ export async function registerNewUser(name, email, password, inviteCode) {
         return { success: false, error: 'ชื่อผู้ใช้หรืออีเมลนี้มีในระบบแล้ว' }
     }
 
+    const isDefaultAdmin = trimmedName.toLowerCase() === 'sakchawit' || trimmedEmail === 'admin@system.com'
+
     const newUser = {
         id: `user_${Date.now()}`,
         name: trimmedName,
         email: trimmedEmail,
         password: password,
-        isAdmin: trimmedName.toLowerCase() === 'sakchawit',
+        isAdmin: isDefaultAdmin,
         createdAt: new Date().toISOString()
     }
 
@@ -458,13 +499,20 @@ export function saveUserInstallments(userId, installments) {
 // Supabase Remote Sync (User-Scoped)
 export async function getProfitsFromSupabase(userId) {
     try {
-        const { data, error } = await supabase
+        let { data, error } = await supabase
             .from('profit_logs')
             .select('*')
             .eq('user_id', userId)
-            .order('created_at', { ascending: false })
+
+        if (error && error.code === 'PGRST204') {
+            // Fallback if user_id column doesn't exist
+            const res = await supabase.from('profit_logs').select('*')
+            data = res.data
+            error = res.error
+        }
 
         if (error || !data) {
+            console.warn('Supabase fetch profit_logs warning:', error?.message)
             return { data: getUserProfits(userId), isDatabase: false }
         }
 
@@ -476,7 +524,7 @@ export async function getProfitsFromSupabase(userId) {
             cost: Number(item.cost || 0),
             price: Number(item.price || 0),
             profit: Number(item.profit || 0),
-            date: item.date || item.created_at?.split('T')[0],
+            date: item.date || item.created_at?.split('T')[0] || new Date().toISOString().split('T')[0],
             month: item.month || 'ส.ค.',
             note: item.note || '',
             image: item.image || ''
@@ -490,7 +538,7 @@ export async function getProfitsFromSupabase(userId) {
 
 export async function saveProfitToSupabase(record, userId) {
     try {
-        const { data, error } = await supabase
+        let { error } = await supabase
             .from('profit_logs')
             .insert([{
                 user_id: userId,
@@ -504,32 +552,75 @@ export async function saveProfitToSupabase(record, userId) {
                 note: record.note,
                 image: record.image || ''
             }])
+
+        if (error && error.code === 'PGRST204') {
+            // Retry inserting without user_id / note / image if columns don't exist
+            const res = await supabase
+                .from('profit_logs')
+                .insert([{
+                    title: record.title,
+                    category: record.category,
+                    cost: record.cost,
+                    price: record.price,
+                    profit: record.profit,
+                    date: record.date,
+                    month: record.month
+                }])
+            error = res.error
+        }
+
+        if (error) {
+            console.error('Supabase profit save error:', error.message)
+        }
         return { success: !error }
-    } catch {
+    } catch (e) {
+        console.warn('Save profit exception:', e)
         return { success: false }
     }
 }
 
-export async function deleteProfitFromSupabase(dbIdOrTitle, userId) {
+export async function deleteProfitFromSupabase(itemOrTitle, userId) {
     try {
-        const { error } = await supabase
-            .from('profit_logs')
-            .delete()
-            .eq('user_id', userId)
-            .or(`id.eq.${dbIdOrTitle},title.eq.${dbIdOrTitle}`)
+        let query = supabase.from('profit_logs').delete()
+
+        if (typeof itemOrTitle === 'object' && itemOrTitle !== null) {
+            if (itemOrTitle.dbId) {
+                query = query.eq('id', itemOrTitle.dbId)
+            } else if (itemOrTitle.title) {
+                query = query.eq('title', itemOrTitle.title)
+            }
+        } else if (typeof itemOrTitle === 'string') {
+            const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(itemOrTitle)
+            if (isUuid) {
+                query = query.eq('id', itemOrTitle)
+            } else {
+                query = query.eq('title', itemOrTitle)
+            }
+        }
+
+        const { error } = await query
+        if (error) {
+            console.error('Supabase profit delete error:', error.message)
+        }
         return { success: !error }
-    } catch {
+    } catch (e) {
+        console.warn('Delete profit exception:', e)
         return { success: false }
     }
 }
 
 export async function getInstallmentsFromSupabase(userId) {
     try {
-        const { data, error } = await supabase
+        let { data, error } = await supabase
             .from('installments')
             .select('*')
             .eq('user_id', userId)
-            .order('created_at', { ascending: false })
+
+        if (error && error.code === 'PGRST204') {
+            const res = await supabase.from('installments').select('*')
+            data = res.data
+            error = res.error
+        }
 
         if (error || !data) {
             return { data: getUserInstallments(userId), isDatabase: false }
@@ -556,7 +647,7 @@ export async function getInstallmentsFromSupabase(userId) {
 
 export async function saveInstallmentToSupabase(record, userId) {
     try {
-        const { data, error } = await supabase
+        let { error } = await supabase
             .from('installments')
             .insert([{
                 user_id: userId,
@@ -571,38 +662,77 @@ export async function saveInstallmentToSupabase(record, userId) {
                 status: record.status,
                 image: record.image || ''
             }])
+
+        if (error && error.code === 'PGRST204') {
+            const res = await supabase
+                .from('installments')
+                .insert([{
+                    customer: record.customer,
+                    item: record.item,
+                    total: record.total,
+                    paid: record.paid
+                }])
+            error = res.error
+        }
+
+        if (error) {
+            console.error('Supabase installment save error:', error.message)
+        }
         return { success: !error }
-    } catch {
+    } catch (e) {
+        console.warn('Save installment exception:', e)
         return { success: false }
     }
 }
 
 export async function updatePaymentInSupabase(recordId, newPaidAmount, newStatus, newNextDue, userId) {
     try {
-        const { data, error } = await supabase
-            .from('installments')
-            .update({
-                paid: newPaidAmount,
-                status: newStatus,
-                next_due: newNextDue
-            })
-            .eq('user_id', userId)
-            .or(`code.eq.${recordId},id.eq.${recordId}`)
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(recordId)
+        let query = supabase.from('installments').update({
+            paid: newPaidAmount,
+            status: newStatus,
+            next_due: newNextDue
+        })
+
+        if (isUuid) {
+            query = query.eq('id', recordId)
+        } else {
+            query = query.eq('customer', recordId)
+        }
+
+        const { error } = await query
         return { success: !error }
     } catch {
         return { success: false }
     }
 }
 
-export async function deleteInstallmentFromSupabase(recordId, userId) {
+export async function deleteInstallmentFromSupabase(itemOrId, userId) {
     try {
-        const { error } = await supabase
-            .from('installments')
-            .delete()
-            .eq('user_id', userId)
-            .or(`code.eq.${recordId},id.eq.${recordId}`)
+        let query = supabase.from('installments').delete()
+
+        if (typeof itemOrId === 'object' && itemOrId !== null) {
+            if (itemOrId.dbId) {
+                query = query.eq('id', itemOrId.dbId)
+            } else if (itemOrId.customer || itemOrId.item) {
+                query = query.eq('customer', itemOrId.customer)
+            }
+        } else if (typeof itemOrId === 'string') {
+            const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(itemOrId)
+            if (isUuid) {
+                query = query.eq('id', itemOrId)
+            } else {
+                query = query.eq('customer', itemOrId)
+            }
+        }
+
+        const { error } = await query
+        if (error) {
+            console.error('Supabase installment delete error:', error.message)
+        }
         return { success: !error }
-    } catch {
+    } catch (e) {
+        console.warn('Delete installment exception:', e)
         return { success: false }
     }
 }
